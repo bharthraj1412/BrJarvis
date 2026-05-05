@@ -13,24 +13,39 @@ What this does:
 """
 import os
 import sys
+import argparse
 import shutil
 import subprocess
 from pathlib import Path
 
 # ── The upgraded files to copy ─────────────────────────────────────────────
 UPGRADE_DIR = Path(__file__).parent
-if len(sys.argv) > 1 and sys.argv[1].strip():
-    TARGET_DIR = Path(sys.argv[1]).resolve()
-else:
+TARGET_DIR = None
+
+
+def _resolve_target_dir() -> Path:
+    parser = argparse.ArgumentParser(
+        description="Apply the Gemini-native upgrade to a JARVIS MK37 project.",
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        help="Path to JARVIS project root (defaults to current directory in non-interactive mode).",
+    )
+    args = parser.parse_args()
+
+    if args.target:
+        return Path(args.target).resolve()
+
     # Non-interactive safe default: current directory
+    if not sys.stdin.isatty():
+        return Path('.').resolve()
+
     try:
-        # If running interactively, allow user to specify a path
-        if sys.stdin.isatty():
-            TARGET_DIR = Path(input("Enter your JARVIS project root path (or press Enter for current dir): ").strip() or ".").resolve()
-        else:
-            TARGET_DIR = Path('.').resolve()
-    except Exception:
-        TARGET_DIR = Path('.').resolve()
+        entered = input("Enter your JARVIS project root path (or press Enter for current dir): ").strip()
+    except EOFError:
+        entered = ""
+    return Path(entered or '.').resolve()
 
 FILES_TO_UPGRADE = [
     # (source_relative, target_relative)
@@ -89,6 +104,9 @@ def print_warn(msg: str):
 
 
 def main():
+    global TARGET_DIR
+    TARGET_DIR = _resolve_target_dir()
+
     print("\n" + "="*60)
     print("  JARVIS MK37 — Gemini-Native Upgrade")
     print("="*60)
@@ -109,9 +127,18 @@ def main():
         # Add missing keys to existing .env
         existing = env_path.read_text(encoding="utf-8")
         if "GEMINI_API_KEY" not in existing:
+            migrated_value = None
+            for line in existing.splitlines():
+                if line.startswith("GOOGLE_API_KEY="):
+                    migrated_value = line.split("=", 1)[1].strip()
+                    break
             with open(env_path, "a") as f:
-                f.write("\n# Added by upgrade\nGEMINI_API_KEY=your_gemini_api_key_here\n")
-            print_ok("Added GEMINI_API_KEY slot to existing .env")
+                if migrated_value:
+                    f.write(f"\n# Added by upgrade (migrated from GOOGLE_API_KEY)\nGEMINI_API_KEY={migrated_value}\n")
+                    print_ok("Migrated GOOGLE_API_KEY to GEMINI_API_KEY in existing .env")
+                else:
+                    f.write("\n# Added by upgrade\nGEMINI_API_KEY=your_gemini_api_key_here\n")
+                    print_ok("Added GEMINI_API_KEY slot to existing .env")
         else:
             print_ok(".env already configured")
 
@@ -123,6 +150,10 @@ def main():
         tgt = TARGET_DIR / tgt_rel
         if not src.exists():
             print_warn(f"Source not found: {src_rel} (skipping)")
+            continue
+        if src.resolve() == tgt.resolve():
+            print_ok(f"Already current: {tgt_rel}")
+            upgraded += 1
             continue
         tgt.parent.mkdir(parents=True, exist_ok=True)
         # Backup original
