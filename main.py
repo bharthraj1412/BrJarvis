@@ -139,6 +139,51 @@ def _resolve_audio_device(kind: str, env_var: str) -> int | None:
     return None
 
 
+def _open_input_stream(device: int | None, callback):
+    """Open input stream and fallback to default device when the chosen device fails."""
+    attempts = [device]
+    if device is not None:
+        attempts.append(None)
+
+    last_err = None
+    for dev in attempts:
+        try:
+            stream = sd.InputStream(
+                samplerate=SEND_SAMPLE_RATE,
+                channels=CHANNELS,
+                dtype="int16",
+                blocksize=CHUNK_SIZE,
+                callback=callback,
+                device=dev,
+            )
+            return stream, dev
+        except Exception as e:
+            last_err = e
+    raise RuntimeError(last_err or "Unable to open input stream")
+
+
+def _open_output_stream(device: int | None):
+    """Open output stream and fallback to default device when the chosen device fails."""
+    attempts = [device]
+    if device is not None:
+        attempts.append(None)
+
+    last_err = None
+    for dev in attempts:
+        try:
+            stream = sd.RawOutputStream(
+                samplerate=RECEIVE_SAMPLE_RATE,
+                channels=CHANNELS,
+                dtype="int16",
+                blocksize=CHUNK_SIZE,
+                device=dev,
+            )
+            return stream, dev
+        except Exception as e:
+            last_err = e
+    raise RuntimeError(last_err or "Unable to open output stream")
+
+
 def _get_api_key() -> str:
     # Prefer environment variables for deployment flexibility.
     for env_name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
@@ -822,16 +867,11 @@ class JarvisLive:
                 )
 
         try:
-            with sd.InputStream(
-                samplerate=SEND_SAMPLE_RATE,
-                channels=CHANNELS,
-                dtype="int16",
-                blocksize=CHUNK_SIZE,
-                callback=callback,
-                device=self._audio_input_device,
-            ):
-                print(f"[JARVIS] 🎤 Mic stream open (device={self._audio_input_device})")
-                self.ui.write_log(f"SYS: Mic ready (device={self._audio_input_device})")
+            stream, active_device = _open_input_stream(self._audio_input_device, callback)
+            self._audio_input_device = active_device
+            with stream:
+                print(f"[JARVIS] 🎤 Mic stream open (device={active_device})")
+                self.ui.write_log(f"SYS: Mic ready (device={active_device})")
                 while True:
                     await asyncio.sleep(0.1)
         except Exception as e:
@@ -887,16 +927,11 @@ class JarvisLive:
 
     async def _play_audio(self):
         try:
-            stream = sd.RawOutputStream(
-                samplerate=RECEIVE_SAMPLE_RATE,
-                channels=CHANNELS,
-                dtype="int16",
-                blocksize=CHUNK_SIZE,
-                device=self._audio_output_device,
-            )
+            stream, active_device = _open_output_stream(self._audio_output_device)
+            self._audio_output_device = active_device
             stream.start()
             self._audio_output_enabled = True
-            self.ui.write_log(f"SYS: Speaker ready (device={self._audio_output_device})")
+            self.ui.write_log(f"SYS: Speaker ready (device={active_device})")
         except Exception as e:
             self._audio_output_enabled = False
             self.ui.write_log(

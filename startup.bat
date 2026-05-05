@@ -8,6 +8,8 @@ if exist "venv\Scripts\activate.bat" (
     call "venv\Scripts\activate.bat"
 ) else if exist ".venv\Scripts\activate.bat" (
     call ".venv\Scripts\activate.bat"
+) else if exist "..\.venv\Scripts\activate.bat" (
+    call "..\.venv\Scripts\activate.bat"
 )
 
 :: Check Python is available
@@ -22,6 +24,15 @@ if "%ERRORLEVEL%" NEQ "0" (
 :: Silent mode (auto-startup) - launch voice assistant directly, no menu
 if "%~1"=="--silent" (
     echo [JARVIS] Auto-startup - launching voice assistant...
+    python start.py voice
+    goto :end
+)
+
+:: Voice-safe mode: run audio diagnostics first, then voice assistant
+if "%~1"=="--voice-safe" (
+    echo [JARVIS] Running audio diagnostics...
+    python start.py audio
+    echo [JARVIS] Launching voice assistant...
     python start.py voice
     goto :end
 )
