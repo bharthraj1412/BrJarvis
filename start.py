@@ -14,13 +14,18 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any, TextIO, TypedDict, cast
 
 # Fix terminal encoding issues on Windows
 if sys.platform == "win32":
     os.environ["PYTHONIOENCODING"] = "utf-8"
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        stdout_reconfigure = getattr(sys.stdout, "reconfigure", None)
+        stderr_reconfigure = getattr(sys.stderr, "reconfigure", None)
+        if callable(stdout_reconfigure):
+            stdout_reconfigure(encoding="utf-8", errors="replace")
+        if callable(stderr_reconfigure):
+            stderr_reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
@@ -31,8 +36,6 @@ try:
     from rich.table import Table
     from rich.text import Text
     from rich.prompt import Prompt
-    from rich.live import Live
-    from rich import print as rprint
     console = Console()
 except ImportError:
     # Very basic fallback if rich isn't installed (though it should be for JARVIS)
@@ -68,9 +71,14 @@ def _banner():
 
 # ── Status and Check Helpers ──────────────────────────────────────────────────
 
-def _check_env() -> dict:
+class EnvStatus(TypedDict):
+    env_file: bool
+    config_file: bool
+    api_keys: dict[str, bool]
+
+def _check_env() -> EnvStatus:
     """Check environment configuration and return status dict."""
-    status = {"env_file": False, "config_file": False, "api_keys": {}}
+    status: EnvStatus = {"env_file": False, "config_file": False, "api_keys": {}}
     env_file    = BASE_DIR / ".env"
     config_file = BASE_DIR / "config" / "api_keys.json"
 
@@ -143,7 +151,7 @@ def show_status():
     try:
         import urllib.request
         req = urllib.request.Request(f"{ollama_host}/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=1) as resp:
+        with urllib.request.urlopen(req, timeout=1):
             table_be.add_row(f"[green]✓ Ollama[/]", f"[green]Running[/] at {ollama_host}")
             has_any = True
     except Exception:
@@ -174,8 +182,9 @@ def show_status():
         from multi_agent.subagent import load_agent_definitions
         table_sys.add_row("[green]✓ Agent Types[/]", str(len(load_agent_definitions())))
         
-        from tools.registry import TOOL_SCHEMAS
-        table_sys.add_row("[green]✓ Tools Registered[/]", str(len(TOOL_SCHEMAS)))
+        from tools.registry import TOOL_SCHEMAS  # pyright: ignore[reportUnknownVariableType]
+        tool_schemas = cast(list[dict[str, Any]], TOOL_SCHEMAS)
+        table_sys.add_row("[green]✓ Tools Registered[/]", str(len(tool_schemas)))
     except Exception:
         pass
         
@@ -203,10 +212,17 @@ def doctor():
     _banner()
     console.print("[bold magenta]JARVIS Doctor — Dependency Fix[/]\n")
 
-    required = {"google-genai": "google.genai", "sounddevice": "sounddevice", "requests": "requests", 
-                "httpx": "httpx", "Pillow": "PIL", "numpy": "numpy", "psutil": "psutil"}
+    required: dict[str, str] = {
+        "google-genai": "google.genai",
+        "sounddevice": "sounddevice",
+        "requests": "requests",
+        "httpx": "httpx",
+        "Pillow": "PIL",
+        "numpy": "numpy",
+        "psutil": "psutil",
+    }
     
-    missing = []
+    missing: list[str] = []
     
     table = Table(title="Required Dependencies", box=None)
     table.add_column("Package", style="bold")
@@ -246,7 +262,7 @@ def _ensure_log_dir():
 
 def _write_pid(pid: int, mode: str):
     try:
-        data = {"pid": pid, "mode": mode, "started": datetime.now().isoformat()}
+        data: dict[str, Any] = {"pid": pid, "mode": mode, "started": datetime.now().isoformat()}
         PID_FILE.write_text(json.dumps(data), encoding="utf-8")
     except Exception:
         pass
@@ -290,10 +306,22 @@ def launch_both():
     _ensure_log_dir()
     voice_log = LOG_DIR / f"voice_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
-    kwargs = {"cwd": str(BASE_DIR), "stdout": open(voice_log, "w", encoding="utf-8"), "stderr": subprocess.STDOUT}
-    if sys.platform == "win32": kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    
-    vproc = subprocess.Popen([PYTHON, str(BASE_DIR / "main.py")], **kwargs)
+    log_handle: TextIO = open(voice_log, "w", encoding="utf-8")
+    if sys.platform == "win32":
+        vproc = subprocess.Popen(
+            [PYTHON, str(BASE_DIR / "main.py")],
+            cwd=str(BASE_DIR),
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+    else:
+        vproc = subprocess.Popen(
+            [PYTHON, str(BASE_DIR / "main.py")],
+            cwd=str(BASE_DIR),
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+        )
     console.print(f"  [green]✓ Voice GUI Started[/] (PID: {vproc.pid})")
     console.print(f"    [dim]Logs: {voice_log}[/]")
     _write_pid(vproc.pid, "voice+cli")
@@ -313,16 +341,85 @@ def launch_both():
         except Exception:
             console.print("[dim]Ignored.[/]")
         _clear_pid()
+        try:
+            log_handle.close()
+        except Exception:
+            pass
 
 def launch_silent():
     _ensure_log_dir()
     voice_log = LOG_DIR / f"voice_silent_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     try:
-        kwargs = {"cwd": str(BASE_DIR), "stdout": open(voice_log, "w", encoding="utf-8"), "stderr": subprocess.STDOUT}
-        if sys.platform == "win32": kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-        proc = subprocess.Popen([PYTHON, str(BASE_DIR / "main.py")], **kwargs)
+        log_handle: TextIO = open(voice_log, "w", encoding="utf-8")
+        if sys.platform == "win32":
+            proc = subprocess.Popen(
+                [PYTHON, str(BASE_DIR / "main.py")],
+                cwd=str(BASE_DIR),
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            )
+        else:
+            proc = subprocess.Popen(
+                [PYTHON, str(BASE_DIR / "main.py")],
+                cwd=str(BASE_DIR),
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+            )
         _write_pid(proc.pid, "silent")
-    except Exception: pass
+        try:
+            log_handle.close()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def launch_smoke():
+    console.print("\n[bold cyan]▶ Running startup smoke checks[/]")
+    script = BASE_DIR / "scripts" / "smoke_startup.py"
+    if not script.exists():
+        console.print("[red]✗ Smoke script not found.[/]")
+        return
+    try:
+        subprocess.run([PYTHON, str(script)], cwd=str(BASE_DIR), check=False)
+    except KeyboardInterrupt:
+        console.print("\n[dim]Smoke checks interrupted.[/]")
+
+
+def show_audio_status():
+    _banner()
+    console.print("[bold cyan]Audio Diagnostics[/]\n")
+    try:
+        import sounddevice as sd
+        devices = sd.query_devices()
+        default_in, default_out = sd.default.device
+
+        table = Table(title="Audio Devices", title_style="bold magenta", box=None)
+        table.add_column("Idx", style="bold cyan")
+        table.add_column("Type", style="bold")
+        table.add_column("Name")
+        table.add_column("Default")
+
+        for i, dev in enumerate(devices):
+            in_ch = int(dev.get("max_input_channels", 0))
+            out_ch = int(dev.get("max_output_channels", 0))
+            if in_ch <= 0 and out_ch <= 0:
+                continue
+            kind = []
+            if in_ch > 0:
+                kind.append(f"IN({in_ch})")
+            if out_ch > 0:
+                kind.append(f"OUT({out_ch})")
+            is_default = (i == default_in) or (i == default_out)
+            table.add_row(str(i), " / ".join(kind), str(dev.get("name", "")), "*" if is_default else "")
+
+        console.print(table)
+        console.print("\n[dim]Override devices with env vars:[/]")
+        console.print("[dim]  JARVIS_AUDIO_INPUT_DEVICE=<index-or-name>[/]")
+        console.print("[dim]  JARVIS_AUDIO_OUTPUT_DEVICE=<index-or-name>[/]")
+    except Exception as e:
+        console.print(f"[red]✗ Audio diagnostics failed:[/] {e}")
 
 # ── Main Entry ───────────────────────────────────────────────────────────────
 
@@ -345,12 +442,23 @@ def main():
         table.add_row("4", "SCREEN SHARE", "Launch WebSocket Monitor Tool")
         table.add_row("5", "STATUS", "Check AI configuration and module health")
         table.add_row("6", "DOCTOR", "Auto-install missing dependencies")
+        table.add_row("7", "SMOKE", "Run non-destructive startup checks")
+        table.add_row("8", "AUDIO", "List mic/speaker devices and defaults")
         
         console.print(Panel(table, title="[bold]Select Module Sequence[/]", expand=False))
         console.print()
         
-        choice = Prompt.ask("  [cyan]❯[/] Ready", choices=["1", "2", "3", "4", "5", "6"], default="1")
-        mode = {"1": "voice", "2": "cli", "3": "both", "4": "screenshare", "5": "status", "6": "doctor"}[choice]
+        choice = Prompt.ask("  [cyan]❯[/] Ready", choices=["1", "2", "3", "4", "5", "6", "7", "8"], default="1")
+        mode = {
+            "1": "voice",
+            "2": "cli",
+            "3": "both",
+            "4": "screenshare",
+            "5": "status",
+            "6": "doctor",
+            "7": "smoke",
+            "8": "audio",
+        }[choice]
 
     if mode in ("voice", "v", "gui"): launch_voice() if _pre_launch_check() else None
     elif mode in ("cli", "c", "terminal"): launch_cli() if _pre_launch_check() else None
@@ -359,6 +467,8 @@ def main():
     elif mode in ("status", "health"): show_status()
     elif mode in ("doctor", "fix"): doctor()
     elif mode in ("silent",): launch_silent()
+    elif mode in ("smoke", "check", "verify"): launch_smoke()
+    elif mode in ("audio", "sound"): show_audio_status()
     else:
         console.print(f"[red]✗ Unknown launch argument provided.[/]")
         sys.exit(1)
