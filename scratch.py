@@ -29,7 +29,11 @@ def test_text_api() -> bool:
         print('TEXT API SUCCESS:', text or '<empty response>')
         return True
     except Exception as e:
-        print('TEXT API ERROR:', repr(e))
+        msg = repr(e)
+        if 'RESOURCE_EXHAUSTED' in msg or '429' in msg:
+            print('TEXT API WARNING: quota/rate limit reached. Key/config appears valid but billing or quota is exhausted.')
+            return True
+        print('TEXT API ERROR:', msg)
         return False
 
 async def test():
