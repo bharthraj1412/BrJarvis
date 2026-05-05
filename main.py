@@ -96,6 +96,17 @@ def _clean_transcript(text: str) -> str:
     return re.sub(r"[\x00-\x08\x0b-\x1f]", "", text).strip()
 
 
+def _make_audio_media(pcm_bytes: bytes):
+    mime_type = f"audio/pcm;rate={SEND_SAMPLE_RATE}"
+    blob_type = getattr(types, "Blob", None)
+    if blob_type is not None:
+        try:
+            return blob_type(data=pcm_bytes, mime_type=mime_type)
+        except Exception:
+            pass
+    return {"data": pcm_bytes, "mime_type": mime_type}
+
+
 def _resolve_audio_device(kind: str, env_var: str) -> int | None:
     """Resolve audio device index from env override, system default, then first matching device."""
     try:
@@ -863,7 +874,7 @@ class JarvisLive:
             if not speaking and not self.ui.muted:
                 loop.call_soon_threadsafe(
                     _safe_put,
-                    {"data": indata.tobytes(), "mime_type": "audio/pcm"},
+                    _make_audio_media(indata.tobytes()),
                 )
 
         try:
