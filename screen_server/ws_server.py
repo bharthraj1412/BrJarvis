@@ -132,13 +132,16 @@ class ScreenShareServer:
         if not viewers_copy:
             return
 
-        # Send to all viewers concurrently, remove disconnected ones
-        disconnected: list[Any] = []
-        for ws in viewers_copy:
+        # Send to all viewers concurrently, drop disconnected or slow ones
+        async def _send_to_viewer(ws):
             try:
-                await ws.send(frame_data)
+                await asyncio.wait_for(ws.send(frame_data), timeout=2.0)
+                return None
             except Exception:
-                disconnected.append(ws)
+                return ws
+                
+        results = await asyncio.gather(*[_send_to_viewer(ws) for ws in viewers_copy])
+        disconnected = [ws for ws in results if ws is not None]
 
         if disconnected:
             with self._viewers_lock:

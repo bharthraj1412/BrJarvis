@@ -11,10 +11,10 @@ from datetime import datetime
 try:
     import pyautogui
     _PYAUTOGUI = True
-except ImportError:
+except Exception:
     _PYAUTOGUI = False
 
-_OS = platform.system()  # "Windows" | "Darwin" | "Linux"
+_OS = platform.system()
 
 
 def _get_base_dir() -> Path:
@@ -103,8 +103,10 @@ def _execute_generated_code(code: str, player=None) -> str:
 def _ask_gemini_for_desktop_action(task: str) -> str:
 
     import google.generativeai as genai
+    from config.models import get_model
     genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model_name = get_model("gemini") or "gemini-3.5-flash"
+    model = genai.GenerativeModel(model_name)
 
     desktop = str(_get_desktop())
 

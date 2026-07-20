@@ -8,7 +8,11 @@ import threading
 from pathlib import Path
 from datetime import datetime
 
-from config import is_windows, is_mac, is_linux
+import platform
+
+def is_windows() -> bool: return platform.system() == "Windows"
+def is_mac()     -> bool: return platform.system() == "Darwin"
+def is_linux()   -> bool: return platform.system() == "Linux"
 
 _KNOWN_APPIDS: dict[str, tuple[str, str]] = {
     "pubg":                ("578080",  "PUBG: Battlegrounds"),
@@ -103,6 +107,9 @@ def _find_steam_linux() -> Path | None:
         Path.home() / ".steam" / "steam",
         Path.home() / ".steam" / "root",
         Path.home() / ".local"  / "share" / "Steam",
+        Path.home() / ".var" / "app" / "com.valvesoftware.Steam" / "data" / "Steam",
+        Path.home() / ".var" / "app" / "com.valvesoftware.Steam" / ".steam" / "steam",
+        Path.home() / "snap" / "steam" / "common" / ".steam" / "steam",
         Path("/usr/share/steam"),
         Path("/opt/steam"),
     ]:

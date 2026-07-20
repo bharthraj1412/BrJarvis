@@ -25,4 +25,6 @@ from skills import builtin as _builtin  # noqa: F401
 from skills import builtin_editor as _builtin_editor  # noqa: F401
 from skills import builtin_extras as _builtin_extras  # noqa: F401
 from skills import builtin_pro as _builtin_pro  # noqa: F401
+from skills import builtin_writer as _builtin_writer  # noqa: F401
+from skills import builtin_rag as _builtin_rag  # noqa: F401
 

@@ -83,7 +83,8 @@ ctx = get_memory_context()  # may be empty, that's OK
 print('[PASS] 7. Memory Context: builds without error')
 
 # 8. Tool Registry
-from tools.registry import TOOL_SCHEMAS, get_tool_prompt_block, parse_tool_call
+from tools.registry import TOOL_SCHEMAS, get_tool_prompt_block, parse_tool_call, _import_plugins
+_import_plugins()
 assert len(TOOL_SCHEMAS) >= 37, f'Expected 37+ tools, got {len(TOOL_SCHEMAS)}'
 prompt_block = get_tool_prompt_block()
 assert 'AUTO-ALLOW' in prompt_block
@@ -102,8 +103,8 @@ print(f'[PASS] 8. Tool Registry: {len(TOOL_SCHEMAS)} tools, prompt block, parser
 
 # 9. Orchestrator
 from orchestrator import JarvisOrchestrator, MAX_REACT_STEPS
-assert MAX_REACT_STEPS == 15
-print('[PASS] 9. Orchestrator: MAX_REACT_STEPS=15, imports clean')
+assert MAX_REACT_STEPS == 20
+print('[PASS] 9. Orchestrator: MAX_REACT_STEPS=20, imports clean')
 
 # 10. Memory Types
 from memory.memory_types import MEMORY_SYSTEM_PROMPT, MEMORY_TYPES

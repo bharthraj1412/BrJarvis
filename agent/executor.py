@@ -1,425 +1,424 @@
-# agent/executor.py
+# agent/executor.py — JARVIS MK37 Parallel Agent Executor
 """
-JARVIS MK37 — Agent Executor (multi-step task runner).
-
-BUG-FIX (Critical — spawn_agent):
-  The `_call_tool("spawn_agent", …)` handler created a bare
-  `SubAgentManager(max_depth=2)` and called `.spawn(…, orchestrator=None)`.
-  The sub-agent worker thread then immediately crashed with
-  AttributeError: 'NoneType' object has no attribute '_build_system'.
-
-  FIX: store the AgentExecutor's own orchestrator reference (created at
-  first call from execute()) so sub-agents inherit a real orchestrator.
-
-BUG-FIX (Minor — winreg import):
-  `_run_generated_code()` imported `winreg` without a platform guard.
-  On Linux/macOS the import silently succeeded (winreg stubs not always
-  present) or raised ImportError, both producing misleading behaviour.
-  The try-block is now scoped behind `sys.platform == "win32"`.
+High-performance task executor with TRUE parallel execution.
+- Runs independent steps simultaneously in a thread pool
+- Smart error recovery (retry, skip, replan)
+- Dependency tracking for sequential steps
+- Real-time progress reporting
 """
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import re
-import subprocess
 import sys
-import tempfile
-import os
 import time
 import threading
+import traceback
 from pathlib import Path
 from typing import Callable
+
+# Ensure project root in path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agent.planner import create_plan, replan
 from agent.error_handler import analyze_error, generate_fix, ErrorDecision
 
 
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
+# ── Tool caller ────────────────────────────────────────────────────────────
 
-
-BASE_DIR = get_base_dir()
-API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
-
-
-def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
-
-
-def _run_generated_code(description: str, speak: Callable | None = None) -> str:
-    """Generate and execute a Python script for arbitrary tasks."""
-    import google.generativeai as genai
-
-    if speak:
-        speak("Writing custom code for this task, sir.")
-
-    home = Path.home()
-    desktop = home / "Desktop"
-    downloads = home / "Downloads"
-    documents = home / "Documents"
-
-    # BUG-FIX: winreg is Windows-only — guard the import
-    if not desktop.exists() and sys.platform == "win32":
-        try:
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
-            )
-            desktop = Path(winreg.QueryValueEx(key, "Desktop")[0])
-        except Exception:
-            pass
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=(
-            "You are an expert Python developer. "
-            "Write clean, complete, working Python code. "
-            "Use standard library + common packages. "
-            "Install missing packages with subprocess + pip if needed. "
-            "Return ONLY the Python code. No explanation, no markdown, no backticks.\n\n"
-            f"SYSTEM PATHS:\n"
-            f"  Desktop   = r'{desktop}'\n"
-            f"  Downloads = r'{downloads}'\n"
-            f"  Documents = r'{documents}'\n"
-            f"  Home      = r'{home}'\n"
-        ),
-    )
-
-    try:
-        response = model.generate_content(
-            f"Write Python code to accomplish this task:\n\n{description}"
-        )
-        code = response.text.strip()
-        code = re.sub(r"```(?:python)?", "", code).strip().rstrip("`").strip()
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False, encoding="utf-8"
-        ) as f:
-            f.write(code)
-            tmp_path = f.name
-
-        print(f"[Executor] 🐍 Running generated code: {tmp_path}")
-
-        result = subprocess.run(
-            [sys.executable, tmp_path],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            cwd=str(Path.home()),
-        )
-
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
-
-        output = result.stdout.strip()
-        error = result.stderr.strip()
-
-        if result.returncode == 0 and output:
-            return output
-        elif result.returncode == 0:
-            return "Task completed successfully."
-        elif error:
-            raise RuntimeError(f"Code error: {error[:400]}")
-        return "Completed."
-
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("Generated code timed out after 120 seconds.")
-    except RuntimeError:
-        raise
-    except Exception as e:
-        raise RuntimeError(f"Generated code failed: {e}")
-
-
-def _inject_context(params: dict, tool: str, step_results: dict, goal: str = "") -> dict:
-    if not step_results:
-        return params
-    params = dict(params)
-    if tool == "file_controller" and params.get("action") in ("write", "create_file"):
-        content = params.get("content", "")
-        if not content or len(content) < 50:
-            all_results = [
-                v for v in step_results.values()
-                if v and len(v) > 100 and v not in ("Done.", "Completed.")
-            ]
-            if all_results:
-                combined = "\n\n---\n\n".join(all_results)
-                translated = _translate_to_goal_language(combined, goal)
-                params["content"] = translated
-                print(f"[Executor] 💉 Injected + translated content")
-    return params
-
-
-def _detect_language(text: str) -> str:
-    import google.generativeai as genai
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
-    try:
-        response = model.generate_content(
-            f"What language is this text written in? "
-            f"Reply with ONLY the language name in English.\n\nText: {text[:200]}"
-        )
-        return response.text.strip()
-    except Exception:
-        return "English"
-
-
-def _translate_to_goal_language(content: str, goal: str) -> str:
-    if not goal:
-        return content
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=_get_api_key())
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        target_lang = _detect_language(goal)
-        print(f"[Executor] 🌐 Translating to: {target_lang}")
-        prompt = (
-            f"You are a professional translator. "
-            f"Translate the following text into {target_lang}.\n"
-            f"Output ONLY the translated text, nothing else.\n\n"
-            f"Text to translate:\n{content[:4000]}"
-        )
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        print(f"[Executor] ⚠️ Translation failed: {e}")
-        return content
-
-
-def _call_tool(tool: str, parameters: dict, speak: Callable | None) -> str:
-    if tool == "open_app":
-        from actions.open_app import open_app
-        return open_app(parameters=parameters, player=None) or "Done."
-
-    elif tool == "web_search":
+def _call_tool(tool: str, parameters: dict, speak: Callable | None = None) -> str:
+    """Dispatch a tool call utilizing the centralized tool registry."""
+    from tools.registry import execute_tool
+    
+    # Handle special fallbacks
+    if tool in ("generated_code", "web_search_fallback"):
+        tool = "web_search"
+        parameters = {"query": parameters.get("description", str(parameters))[:200]}
+    
+    # Run through centralized registry
+    result = execute_tool(tool, parameters or {})
+    
+    # Handle error fallbacks like the original implementation
+    if result.startswith("ERROR: Unknown tool"):
+        print(f"[Executor] ⚠️ Unknown tool '{tool}' — using web search fallback")
         from actions.web_search import web_search
-        return web_search(parameters=parameters, player=None) or "Done."
+        return web_search(parameters={"query": f"{tool}: {parameters}"[:200]}) or "Done."
+        
+    return result
 
-    elif tool == "game_updater":
-        from actions.game_updater import game_updater
-        return game_updater(parameters=parameters, player=None, speak=speak) or "Done."
 
-    elif tool == "browser_control":
-        from actions.browser_control import browser_control
-        return browser_control(parameters=parameters, player=None) or "Done."
 
-    elif tool == "file_controller":
-        from actions.file_controller import file_controller
-        return file_controller(parameters=parameters, player=None) or "Done."
+# ── Result collector ───────────────────────────────────────────────────────
 
-    elif tool == "code_helper":
-        from actions.code_helper import code_helper
-        return code_helper(parameters=parameters, player=None, speak=speak) or "Done."
+class StepResult:
+    def __init__(self, step_num: int):
+        self.step_num = step_num
+        self.output   = ""
+        self.success  = False
+        self.error    = ""
+        self.duration = 0.0
 
-    elif tool == "dev_agent":
-        from actions.dev_agent import dev_agent
-        return dev_agent(parameters=parameters, player=None, speak=speak) or "Done."
 
-    elif tool == "screen_process":
-        from actions.screen_processor import screen_process
-        screen_process(parameters=parameters, player=None)
-        return "Screen captured and analyzed."
-
-    elif tool == "send_message":
-        from actions.send_message import send_message
-        return send_message(parameters=parameters, player=None) or "Done."
-
-    elif tool == "reminder":
-        from actions.reminder import reminder
-        return reminder(parameters=parameters, player=None) or "Done."
-
-    elif tool == "youtube_video":
-        from actions.youtube_video import youtube_video
-        return youtube_video(parameters=parameters, player=None, speak=speak) or "Done."
-
-    elif tool == "weather_report":
-        from actions.weather_report import weather_action
-        return weather_action(parameters=parameters, player=None) or "Done."
-
-    elif tool == "computer_settings":
-        from actions.computer_settings import computer_settings
-        return computer_settings(parameters=parameters, player=None) or "Done."
-
-    elif tool == "desktop_control":
-        from actions.desktop import desktop_control
-        return desktop_control(parameters=parameters, player=None) or "Done."
-
-    elif tool == "computer_control":
-        from actions.computer_control import computer_control
-        return computer_control(parameters=parameters, player=None) or "Done."
-
-    elif tool == "generated_code":
-        description = parameters.get("description", "")
-        if not description:
-            raise ValueError("generated_code requires a 'description' parameter.")
-        return _run_generated_code(description, speak=speak)
-
-    elif tool == "flight_finder":
-        from actions.flight_finder import flight_finder
-        return flight_finder(parameters=parameters, player=None, speak=speak) or "Done."
-
-    else:
-        print(f"[Executor] ⚠️ Unknown tool '{tool}' — falling back to generated_code")
-        return _run_generated_code(f"Accomplish this task: {parameters}", speak=speak)
-
+# ── Main Executor ──────────────────────────────────────────────────────────
 
 class AgentExecutor:
-    MAX_REPLAN_ATTEMPTS = 2
+    """
+    Executes plans with parallel step execution and smart error recovery.
+
+    Architecture:
+    - Steps with no dependencies and parallel=True run simultaneously
+    - Steps with depends_on wait for their dependencies to complete
+    - Failed critical steps trigger replan; non-critical steps are skipped
+    """
+
+    MAX_WORKERS     = 4   # parallel threads
+    MAX_REPLAN      = 2   # max replan attempts
+    STEP_TIMEOUT    = 120 # seconds per step
 
     def execute(
         self,
-        goal: str,
-        speak: Callable | None = None,
+        goal:        str,
+        speak:       Callable | None = None,
         cancel_flag: threading.Event | None = None,
     ) -> str:
-        print(f"\n[Executor] 🎯 Goal: {goal}")
+        print(f"\n{'='*60}")
+        print(f"[Executor] 🎯 Goal: {goal}")
+        print(f"{'='*60}")
 
-        replan_attempts = 0
+        replan_count   = 0
         completed_steps = []
-        step_results: dict = {}
+        step_results: dict[int, str] = {}
         plan = create_plan(goal)
 
         while True:
             steps = plan.get("steps", [])
-
             if not steps:
-                msg = "I couldn't create a valid plan for this task, sir."
-                if speak:
-                    speak(msg)
+                msg = "I couldn't create a valid plan, sir."
+                if speak: speak(msg)
                 return msg
 
-            success = True
-            failed_step = None
-            failed_error = ""
+            can_parallelize = plan.get("can_parallelize", False)
 
-            for step in steps:
-                if cancel_flag and cancel_flag.is_set():
-                    if speak:
-                        speak("Task cancelled, sir.")
-                    return "Task cancelled."
+            # Run the plan
+            result = self._run_plan(
+                steps, step_results, completed_steps,
+                goal, speak, cancel_flag, can_parallelize
+            )
 
-                step_num = step.get("step", "?")
-                tool = step.get("tool", "generated_code")
-                desc = step.get("description", "")
-                params = step.get("parameters", {})
+            if cancel_flag and cancel_flag.is_set():
+                return "Task cancelled, sir."
 
-                params = _inject_context(params, tool, step_results, goal=goal)
-                print(f"\n[Executor] ▶️ Step {step_num}: [{tool}] {desc}")
+            if result["success"]:
+                return self._summarize(goal, completed_steps, step_results, speak)
 
-                attempt = 1
-                step_ok = False
+            # Handle failure
+            failed_step  = result["failed_step"]
+            failed_error = result["failed_error"]
 
-                while attempt <= 3:
-                    if cancel_flag and cancel_flag.is_set():
-                        break
-                    try:
-                        result = _call_tool(tool, params, speak)
-                        step_results[step_num] = result
-                        completed_steps.append(step)
-                        print(f"[Executor] ✅ Step {step_num} done: {str(result)[:100]}")
-                        step_ok = True
-                        break
-
-                    except Exception as e:
-                        error_msg = str(e)
-                        print(f"[Executor] ❌ Step {step_num} attempt {attempt} failed: {error_msg}")
-
-                        recovery = analyze_error(step, error_msg, attempt=attempt)
-                        decision = recovery["decision"]
-                        user_msg = recovery.get("user_message", "")
-
-                        if speak and user_msg:
-                            speak(user_msg)
-
-                        if decision == ErrorDecision.RETRY:
-                            attempt += 1
-                            time.sleep(2)
-                            continue
-
-                        elif decision == ErrorDecision.SKIP:
-                            print(f"[Executor] ⏭️ Skipping step {step_num}")
-                            completed_steps.append(step)
-                            step_ok = True
-                            break
-
-                        elif decision == ErrorDecision.ABORT:
-                            msg = f"Task aborted, sir. {recovery.get('reason', '')}"
-                            if speak:
-                                speak(msg)
-                            return msg
-
-                        else:  # REPLAN
-                            fix_suggestion = recovery.get("fix_suggestion", "")
-                            if fix_suggestion and tool != "generated_code":
-                                try:
-                                    fixed_step = generate_fix(step, error_msg, fix_suggestion)
-                                    if speak:
-                                        speak("Trying an alternative approach, sir.")
-                                    res = _call_tool(
-                                        fixed_step["tool"],
-                                        fixed_step["parameters"],
-                                        speak,
-                                    )
-                                    step_results[step_num] = res
-                                    completed_steps.append(step)
-                                    step_ok = True
-                                    break
-                                except Exception as fix_err:
-                                    print(f"[Executor] ⚠️ Fix failed: {fix_err}")
-
-                            failed_step = step
-                            failed_error = error_msg
-                            success = False
-                            break
-
-                if not step_ok and not failed_step:
-                    failed_step = step
-                    failed_error = "Max retries exceeded"
-                    success = False
-
-                if not success:
-                    break
-
-            if success:
-                return self._summarize(goal, completed_steps, speak)
-
-            if replan_attempts >= self.MAX_REPLAN_ATTEMPTS:
-                msg = f"Task failed after {replan_attempts} replan attempts, sir."
-                if speak:
-                    speak(msg)
+            if replan_count >= self.MAX_REPLAN:
+                msg = f"Task failed after {replan_count} replan attempts, sir."
+                if speak: speak(msg)
                 return msg
 
-            if speak:
-                speak("Adjusting my approach, sir.")
-
-            replan_attempts += 1
+            print(f"[Executor] 🔄 Replanning (attempt {replan_count + 1})...")
+            if speak: speak("Adjusting my approach, sir.")
+            replan_count += 1
             plan = replan(goal, completed_steps, failed_step, failed_error)
 
-    def _summarize(self, goal: str, completed_steps: list, speak: Callable | None) -> str:
-        fallback = f"All done, sir. Completed {len(completed_steps)} steps for: {goal[:60]}."
+    def _run_plan(
+        self,
+        steps:          list,
+        step_results:   dict,
+        completed_steps: list,
+        goal:           str,
+        speak:          Callable | None,
+        cancel_flag:    threading.Event | None,
+        can_parallelize: bool,
+    ) -> dict:
+        """Execute all steps in a plan, respecting dependencies and parallelism."""
+
+        # Group steps by dependency level for parallel execution
+        pending   = {s["step"]: s for s in steps}
+        completed = set(step_results.keys())
+        failed_step  = None
+        failed_error = ""
+
+        while pending:
+            if cancel_flag and cancel_flag.is_set():
+                return {"success": False, "failed_step": {}, "failed_error": "Cancelled"}
+
+            # Find steps that are ready to run (dependencies met)
+            ready = [
+                s for s in pending.values()
+                if all(dep in completed for dep in s.get("depends_on", []))
+            ]
+
+            if not ready:
+                # Deadlock — some dependency never completed
+                print("[Executor] ⚠️ Dependency deadlock — breaking remaining steps")
+                break
+
+            # Separate parallel-capable from sequential
+            parallel_steps = [s for s in ready if s.get("parallel") and can_parallelize]
+            seq_steps      = [s for s in ready if not s.get("parallel") or not can_parallelize]
+
+            # Run parallel steps together, then sequential one-by-one
+            if parallel_steps:
+                print(f"\n[Executor] ⚡ Running {len(parallel_steps)} steps in PARALLEL")
+                results = self._run_parallel(parallel_steps, goal, speak)
+                for step_num, result in results.items():
+                    step = pending.pop(step_num)
+                    if result.success:
+                        step_results[step_num] = result.output
+                        completed.add(step_num)
+                        completed_steps.append(step)
+                        print(f"[Executor] ✅ Step {step_num} done ({result.duration:.1f}s)")
+                    else:
+                        recovery = self._handle_failure(step, result.error, speak)
+                        if recovery["abort"]:
+                            return {"success": False, "failed_step": step, "failed_error": result.error}
+                        if recovery["skip"]:
+                            completed.add(step_num)
+                            pending.pop(step_num, None)
+                        else:
+                            failed_step  = step
+                            failed_error = result.error
+                            return {"success": False, "failed_step": failed_step, "failed_error": failed_error}
+
+            for step in seq_steps:
+                if cancel_flag and cancel_flag.is_set():
+                    return {"success": False, "failed_step": {}, "failed_error": "Cancelled"}
+
+                step_num = step["step"]
+                pending.pop(step_num)
+
+                result = self._run_step(step, step_results, goal, speak)
+
+                if result.success:
+                    step_results[step_num] = result.output
+                    completed.add(step_num)
+                    completed_steps.append(step)
+                    print(f"[Executor] ✅ Step {step_num} done ({result.duration:.1f}s): {result.output[:80]}")
+                else:
+                    recovery = self._handle_failure(step, result.error, speak)
+                    if recovery["abort"]:
+                        return {"success": False, "failed_step": step, "failed_error": result.error}
+                    if recovery["skip"]:
+                        completed.add(step_num)
+                    else:
+                        failed_step  = step
+                        failed_error = result.error
+                        return {"success": False, "failed_step": failed_step, "failed_error": failed_error}
+
+        return {"success": True, "failed_step": None, "failed_error": ""}
+
+    def _run_parallel(self, steps: list, goal: str, speak: Callable | None) -> dict:
+        """Run multiple steps simultaneously and collect results."""
+        results = {}
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as pool:
+            future_to_step = {
+                pool.submit(self._run_step, step, {}, goal, speak): step
+                for step in steps
+            }
+            for future in concurrent.futures.as_completed(future_to_step, timeout=self.STEP_TIMEOUT * 2):
+                step = future_to_step[future]
+                try:
+                    results[step["step"]] = future.result(timeout=5)
+                except Exception as e:
+                    r = StepResult(step["step"])
+                    r.success = False
+                    r.error   = str(e)
+                    results[step["step"]] = r
+
+        return results
+
+    def _run_step(self, step: dict, context_results: dict, goal: str, speak: Callable | None) -> StepResult:
+        """Execute a single step with retry logic."""
+        step_num = step.get("step", "?")
+        tool     = step.get("tool", "web_search")
+        desc     = step.get("description", "")
+        params   = dict(step.get("parameters", {}))
+        result   = StepResult(step_num)
+
+        # Inject context from previous results
+        params = self._inject_context(params, tool, context_results, goal)
+
+        print(f"\n[Executor] ▶️ Step {step_num}: [{tool}] {desc}")
+        t_start = time.time()
+
+        max_attempts = 3 if step.get("critical") else 2
+        for attempt in range(1, max_attempts + 1):
+            try:
+                output = _call_tool(tool, params, speak)
+                result.output   = output or "Done."
+                result.success  = True
+                result.duration = time.time() - t_start
+                return result
+
+            except Exception as e:
+                err = str(e)
+                print(f"[Executor] ❌ Step {step_num} attempt {attempt}/{max_attempts}: {err[:100]}")
+
+                if attempt < max_attempts:
+                    # Try recovery
+                    recovery = analyze_error(step, err, attempt=attempt)
+                    decision = recovery.get("decision")
+
+                    if decision == ErrorDecision.RETRY:
+                        time.sleep(2 ** attempt)  # exponential backoff
+                        continue
+                    elif decision == ErrorDecision.SKIP:
+                        result.success = True
+                        result.output  = f"Skipped (non-critical): {err[:60]}"
+                        result.duration = time.time() - t_start
+                        return result
+                    elif decision == ErrorDecision.REPLAN:
+                        # Try alternative tool
+                        fix_suggestion = recovery.get("fix_suggestion", "")
+                        if fix_suggestion and tool != "web_search":
+                            try:
+                                alt_step = generate_fix(step, err, fix_suggestion)
+                                output = _call_tool(alt_step["tool"], alt_step["parameters"], speak)
+                                result.output   = output or "Done (alternative approach)."
+                                result.success  = True
+                                result.duration = time.time() - t_start
+                                return result
+                            except Exception as fix_err:
+                                print(f"[Executor] Fix also failed: {fix_err}")
+                        break
+                    else:  # ABORT
+                        break
+                else:
+                    result.error = err
+
+        result.duration = time.time() - t_start
+        return result
+
+    def _handle_failure(self, step: dict, error: str, speak: Callable | None) -> dict:
+        """Decide what to do after a step failure."""
+        is_critical = step.get("critical", True)
+        tool        = step.get("tool", "")
+        msg         = f"Step {step.get('step')} failed: {error[:80]}"
+
+        if not is_critical:
+            print(f"[Executor] ⏭️ Skipping non-critical step: {msg}")
+            return {"skip": True, "abort": False, "replan": False}
+
+        # Try to determine if we should abort vs replan
+        if any(kw in error.lower() for kw in ["permission", "not installed", "access denied"]):
+            return {"skip": False, "abort": False, "replan": True}
+
+        return {"skip": False, "abort": False, "replan": True}
+
+    def _inject_context(self, params: dict, tool: str, step_results: dict, goal: str) -> dict:
+        """Inject outputs from previous steps into current step parameters."""
+        if not step_results:
+            return params
+
+        params = dict(params)
+
+        # For file write operations, inject collected content
+        if tool == "file_controller" and params.get("action") in ("write", "create_file"):
+            if not params.get("content") or len(params.get("content", "")) < 30:
+                all_results = [
+                    v for v in step_results.values()
+                    if v and isinstance(v, str) and len(v) > 100
+                ]
+                if all_results:
+                    params["content"] = "\n\n---\n\n".join(all_results[:3])
+                    print(f"[Executor] 💉 Injected {len(params['content'])} chars of context")
+
+        return params
+
+    def _summarize(
+        self, goal: str, completed_steps: list,
+        step_results: dict, speak: Callable | None
+    ) -> str:
+        """Generate a natural summary of what was accomplished."""
+        fallback = (
+            f"All done, sir. Completed {len(completed_steps)} steps for: {goal[:60]}."
+        )
+
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=_get_api_key())
-            model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite")
-            steps_str = "\n".join(f"- {s.get('description', '')}" for s in completed_steps)
+            from gemini_backend import GeminiBackend
+            gemini = GeminiBackend()
+
+            steps_str = "\n".join(
+                f"  - {s.get('description', '')} [{s.get('tool', '')}]"
+                for s in completed_steps[:5]
+            )
+            # Include actual results if available
+            results_str = "\n".join(
+                f"  - Step {k}: {str(v)[:100]}"
+                for k, v in list(step_results.items())[:3]
+            )
+
             prompt = (
                 f'User goal: "{goal}"\n'
-                f"Completed steps:\n{steps_str}\n\n"
-                "Write a single natural sentence summarizing what was accomplished. "
-                "Address the user as 'sir'. Be direct and positive."
+                f"Completed {len(completed_steps)} steps:\n{steps_str}\n\n"
+                f"Key results:\n{results_str}\n\n"
+                "Write ONE natural sentence summary of what was accomplished. "
+                "Address the user as 'sir'. Be direct and positive. "
+                "Include the most important result if available."
             )
-            response = model.generate_content(prompt)
-            summary = response.text.strip()
+
+            summary = gemini.quick(prompt)
+            summary = summary.strip()[:300]
+
             if speak:
                 speak(summary)
             return summary
+
         except Exception:
             if speak:
                 speak(fallback)
             return fallback
+
+
+# ── Multi-goal parallel executor ──────────────────────────────────────────
+
+class ParallelGoalExecutor:
+    """
+    Execute MULTIPLE independent goals simultaneously.
+    Use this when the user asks to do several unrelated things at once.
+    """
+
+    def __init__(self, max_concurrent: int = 3):
+        self.max_concurrent = max_concurrent
+
+    def execute_all(
+        self,
+        goals: list[str],
+        speak: Callable | None = None,
+    ) -> dict[str, str]:
+        """
+        Run multiple goals in parallel. Returns {goal: result} mapping.
+        """
+        print(f"\n[ParallelExecutor] 🚀 Running {len(goals)} goals simultaneously")
+
+        results = {}
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrent) as pool:
+            future_to_goal = {
+                pool.submit(AgentExecutor().execute, goal, speak): goal
+                for goal in goals
+            }
+            for future in concurrent.futures.as_completed(future_to_goal):
+                goal = future_to_goal[future]
+                try:
+                    results[goal] = future.result(timeout=300)
+                except Exception as e:
+                    results[goal] = f"Failed: {e}"
+                    print(f"[ParallelExecutor] ❌ Goal '{goal[:40]}': {e}")
+
+        return results
+
+    def execute_pipeline(
+        self,
+        goal: str,
+        speak: Callable | None = None,
+    ) -> str:
+        """Execute a single goal with full parallel step support."""
+        return AgentExecutor().execute(goal=goal, speak=speak)

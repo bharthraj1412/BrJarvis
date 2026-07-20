@@ -11,16 +11,16 @@ try:
     pyautogui.FAILSAFE = True
     pyautogui.PAUSE    = 0.05
     _PYAUTOGUI = True
-except ImportError:
+except Exception:
     _PYAUTOGUI = False
 
 try:
     import pyperclip
     _PYPERCLIP = True
-except ImportError:
+except Exception:
     _PYPERCLIP = False
 
-_OS = platform.system()  # "Windows" | "Darwin" | "Linux"
+_OS = platform.system()
 
 
 def _get_base_dir() -> Path:
@@ -29,9 +29,23 @@ def _get_base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 def _get_api_key() -> str:
-    path = _get_base_dir() / "config" / "api_keys.json"
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+    for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = platform.os.environ.get(env, "").strip() if hasattr(platform, "os") else ""
+        if val:
+            return val
+    try:
+        import os
+        for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+            val = os.environ.get(env, "").strip()
+            if val:
+                return val
+        path = _get_base_dir() / "config" / "api_keys.json"
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data.get("gemini_api_key", "")
+    except Exception:
+        pass
+    return ""
 
 def _get_macos_wifi_interface() -> str:
     try:
@@ -49,6 +63,46 @@ def _get_macos_wifi_interface() -> str:
         pass
     return "en0" 
 
+def _linux_volume_cmd(action: str, value: int | str = None):
+    """Try pactl -> wpctl -> amixer fallback for robust Linux audio control across distros."""
+    if action == "up":
+        cmds = [
+            ["pactl", "set-sink-volume", "@DEFAULT_SINK@", "+10%"],
+            ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "10%+"],
+            ["amixer", "-q", "set", "Master", "10%+"],
+        ]
+    elif action == "down":
+        cmds = [
+            ["pactl", "set-sink-volume", "@DEFAULT_SINK@", "-10%"],
+            ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "10%-"],
+            ["amixer", "-q", "set", "Master", "10%-"],
+        ]
+    elif action == "mute":
+        cmds = [
+            ["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"],
+            ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"],
+            ["amixer", "-q", "set", "Master", "toggle"],
+        ]
+    elif action == "set":
+        val_str = str(value)
+        val_float = round(float(value) / 100.0, 2)
+        cmds = [
+            ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{val_str}%"],
+            ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(val_float)],
+            ["amixer", "-q", "set", "Master", f"{val_str}%"],
+        ]
+    else:
+        return
+
+    for c in cmds:
+        try:
+            res = subprocess.run(c, capture_output=True, timeout=2)
+            if res.returncode == 0:
+                return
+        except Exception:
+            pass
+
+
 def volume_up():
     if _OS == "Windows":
         for _ in range(5): pyautogui.press("volumeup")
@@ -57,8 +111,7 @@ def volume_up():
             "set volume output volume (output volume of (get volume settings) + 10)"],
             capture_output=True)
     else:
-        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", "+10%"],
-            capture_output=True)
+        _linux_volume_cmd("up")
 
 def volume_down():
     if _OS == "Windows":
@@ -68,8 +121,7 @@ def volume_down():
             "set volume output volume (output volume of (get volume settings) - 10)"],
             capture_output=True)
     else:
-        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", "-10%"],
-            capture_output=True)
+        _linux_volume_cmd("down")
 
 def volume_mute():
     if _OS == "Windows":
@@ -78,8 +130,7 @@ def volume_mute():
         subprocess.run(["osascript", "-e", "set volume with output muted"],
             capture_output=True)
     else:
-        subprocess.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"],
-            capture_output=True)
+        _linux_volume_cmd("mute")
 
 def volume_set(value: int):
     value = max(0, min(100, int(value)))
@@ -104,8 +155,7 @@ def volume_set(value: int):
             capture_output=True)
         return
     else:
-        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{value}%"],
-            capture_output=True)
+        _linux_volume_cmd("set", value)
         return
 
 def _win_brightness_change(delta: int):
@@ -718,9 +768,9 @@ def _detect_action(description: str) -> dict:
 
     try:
         from config.models import get_model
-        model_name = get_model("gemini") or "gemini-2.5-flash-lite"
+        model_name = get_model("gemini") or "gemini-3.5-flash"
     except Exception:
-        model_name = "gemini-2.5-flash-lite"
+        model_name = "gemini-3.5-flash"
 
     import google.generativeai as genai
     genai.configure(api_key=_get_api_key())

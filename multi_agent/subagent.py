@@ -153,6 +153,54 @@ _BUILTIN_AGENTS: Dict[str, AgentDefinition] = {
         tools=["run_code", "file_read", "file_write", "file_list", "web_search", "system_monitor"],
         source="built-in",
     ),
+    "network-engineer": AgentDefinition(
+        name="network-engineer",
+        description="Network engineering agent — port scanning, DNS, routing, firewall rules, latency analysis.",
+        system_prompt=(
+            "You are a network engineering specialist.\n"
+            "- Analyze IP routing, DNS resolution, port listening states, and interface statistics\n"
+            "- Diagnose network bottlenecks, packet drops, firewall blockages, and SSL issues\n"
+            "- Provide safe diagnostic commands (ip, netstat, ss, ping, traceroute, dig, curl)\n"
+            "Output format: detailed diagnostic overview with network diagrams or tables\n"
+        ),
+        tools=["run_code", "cli_controller", "system_monitor", "web_search"],
+        source="built-in",
+    ),
+    "security-auditor": AgentDefinition(
+        name="security-auditor",
+        description="Security auditor agent — permissions check, privilege escalation risk scan, vulnerability audit.",
+        system_prompt=(
+            "You are a security auditing specialist.\n"
+            "- Inspect file permissions, SUID binaries, open ports, and running processes\n"
+            "- Check environment variables and config files for leaked keys or weak security policies\n"
+            "- Report findings cleanly classified as Critical, High, Medium, or Low risk\n"
+        ),
+        tools=["run_code", "file_read", "file_list", "system_monitor"],
+        source="built-in",
+    ),
+    "browser-automation": AgentDefinition(
+        name="browser-automation",
+        description="Browser automation agent — web scraping, web visual control, form automation.",
+        system_prompt=(
+            "You are a web automation specialist powered by Playwright and headless web tools.\n"
+            "- Extract web content, automate multi-page forms, and interact with complex web UI\n"
+            "- Handle dynamic JavaScript rendering, cookie management, and structured data extraction\n"
+        ),
+        tools=["web_search", "fetch_page", "file_write", "run_code"],
+        source="built-in",
+    ),
+    "live-os-controller": AgentDefinition(
+        name="live-os-controller",
+        description="Live OS control agent — visual screen perception, visual grounding, fast desktop reaction loop.",
+        system_prompt=(
+            "You are an autonomous Live OS desktop controller.\n"
+            "- Perception: Analyze real-time screen display frame state using high-speed screen hashing\n"
+            "- Action: Execute precise mouse clicks, dragging, keyboard typing, and window switching\n"
+            "- Goal: Automate desktop applications seamlessly across X11 and Wayland Linux displays\n"
+        ),
+        tools=["computer_control", "keyboard_type", "keyboard_hotkey", "focus_window", "system_monitor"],
+        source="built-in",
+    ),
 }
 
 

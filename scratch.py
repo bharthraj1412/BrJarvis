@@ -20,21 +20,27 @@ live_model_name = os.getenv('JARVIS_MODEL_VOICE_LIVE', 'models/gemini-2.5-flash-
 
 
 def test_text_api() -> bool:
-    try:
-        response = client.models.generate_content(
-            model=model_name,
-            contents='Reply with exactly: OK',
-        )
-        text = (response.text or '').strip()
-        print('TEXT API SUCCESS:', text or '<empty response>')
-        return True
-    except Exception as e:
-        msg = repr(e)
-        if 'RESOURCE_EXHAUSTED' in msg or '429' in msg:
-            print('TEXT API WARNING: quota/rate limit reached. Key/config appears valid but billing or quota is exhausted.')
+    models_to_test = [
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+    ]
+    for model in models_to_test:
+        print(f"Testing model: {model}...")
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents='Reply with exactly: OK',
+            )
+            text = (response.text or '').strip()
+            print(f'TEXT API SUCCESS ({model}):', text or '<empty response>')
             return True
-        print('TEXT API ERROR:', msg)
-        return False
+        except Exception as e:
+            msg = repr(e)
+            print(f'TEXT API ERROR ({model}):', msg)
+    return False
 
 async def test():
     try:

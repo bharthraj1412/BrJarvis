@@ -1,16 +1,22 @@
 # tools/web.py
 from __future__ import annotations
 
-import httpx
-from duckduckgo_search import DDGS
+_DDG_AVAILABLE = False
+try:
+    from duckduckgo_search import DDGS
+    _DDG_AVAILABLE = True
+except Exception:
+    _DDG_AVAILABLE = False
 
 try:
     from playwright.async_api import async_playwright
     _PLAYWRIGHT_AVAILABLE = True
-except ImportError:
+except Exception:
     _PLAYWRIGHT_AVAILABLE = False
 
 async def web_search(query: str, max_results: int = 10) -> list[dict]:
+    if not _DDG_AVAILABLE:
+        return [{"error": "duckduckgo_search is not available."}]
     with DDGS() as ddgs:
         return list(ddgs.text(query, max_results=max_results))
 

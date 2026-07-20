@@ -72,7 +72,8 @@ def _get_api_key() -> str:
 def _get_os() -> str:
     return _load_config().get("os_system", "windows").lower()
 
-_LIVE_MODEL         = "models/gemini-2.5-flash-native-audio-preview-12-2025"
+from config.models import get_model
+_LIVE_MODEL         = get_model("voice_live") or "models/gemini-3.1-flash-live-preview"
 _CHANNELS           = 1
 _RECEIVE_SAMPLE_RATE = 24_000
 _CHUNK_SIZE         = 1_024

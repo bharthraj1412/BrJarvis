@@ -208,6 +208,76 @@ Monitor: $ARGUMENTS
 """
 
 
+_SYS_TELEMETRY_PROMPT = """\
+You are a system telemetry specialist. Analyze CPU, memory, disk, network, and process load.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Execute system_monitor tool to fetch system metrics.
+2. Formulate a comprehensive health summary table detailing:
+   - CPU utilization per core
+   - Memory usage (Used vs Total)
+   - Disk partition space
+   - Network throughput
+   - Top 5 resource-consuming processes
+3. Highlight any performance bottlenecks or anomalies.
+"""
+
+_LIVE_OS_SKILL_PROMPT = """\
+You are an autonomous Live OS controller. Execute visual desktop interactions.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Execute computer_control to sense display geometry and take frame screenshots.
+2. Target key UI elements, windows, buttons, or input boxes.
+3. Perform mouse click, drag, hotkey typing, or window focus.
+4. Verify execution results from the updated screen state.
+"""
+
+_NETWORK_DIAG_PROMPT = """\
+You are a network engineer. Run a complete network diagnostic scan.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Check interface IP addresses, default gateway, and DNS resolvers.
+2. Run connectivity tests to target host using ping or curl.
+3. Inspect listening network sockets and firewall filters.
+4. Present findings in a structured Markdown report.
+"""
+
+_CODE_AUDIT_PROMPT = """\
+You are a security auditor. Inspect the codebase for vulnerabilities and quality.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Enumerate files in the repository using file_list.
+2. Scan critical source code for hardcoded secrets, injection vectors, or unhandled exceptions.
+3. Categorize findings into Critical, High, Medium, Low risk.
+4. Provide concrete fix recommendations.
+"""
+
+_API_TEST_PROMPT = """\
+You are an API testing engineer. Test HTTP REST API endpoints.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Extract HTTP method, URL, headers, and request body.
+2. Execute request using fetch_raw or curl.
+3. Validate status code, response headers, latency, and payload schema.
+4. Output detailed test summary.
+"""
+
+
 def _register_extra_builtins() -> None:
     """Register all extra built-in skills."""
 
@@ -280,6 +350,81 @@ def _register_extra_builtins() -> None:
         file_path="<builtin>",
         when_to_use="Use when the user wants to check if a website is up or monitor its availability.",
         argument_hint="<URL to monitor>",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="sys_telemetry",
+        description="System CPU, RAM, Disk, and Process Telemetry monitor",
+        triggers=["/telemetry", "/sys-mon", "/resource-usage"],
+        tools=["system_monitor", "run_code"],
+        prompt=_SYS_TELEMETRY_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use when the user wants a real-time hardware and process health check.",
+        argument_hint="[optional interval or filter]",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="live_os_control_skill",
+        description="Autonomous visual live OS desktop control skill",
+        triggers=["/live-os", "/antigravity-mode", "/desktop-auto"],
+        tools=["computer_control", "keyboard_type", "keyboard_hotkey", "focus_window"],
+        prompt=_LIVE_OS_SKILL_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use when the user requests autonomous visual live OS control.",
+        argument_hint="<desktop goal>",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="network_diag",
+        description="Network diagnostic, DNS, IP routing, and port inspection skill",
+        triggers=["/network-diag", "/net-check", "/port-scan"],
+        tools=["cli_controller", "system_monitor", "run_code"],
+        prompt=_NETWORK_DIAG_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use when diagnosing network connectivity or port listening states.",
+        argument_hint="[host or IP]",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="code_audit",
+        description="Repository code security, quality, and vulnerability audit skill",
+        triggers=["/code-audit", "/sec-audit", "/lint-check"],
+        tools=["file_read", "file_list", "run_code"],
+        prompt=_CODE_AUDIT_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use to audit codebases for vulnerabilities, secrets leaks, and quality issues.",
+        argument_hint="[path or repo]",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="api_test",
+        description="HTTP REST API benchmark and response validator skill",
+        triggers=["/api-test", "/http-test", "/rest-check"],
+        tools=["fetch_raw", "run_code"],
+        prompt=_API_TEST_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use to test or benchmark API endpoints.",
+        argument_hint="<URL or API spec>",
         arguments=[],
         user_invocable=True,
         context="inline",

@@ -14,8 +14,17 @@ Rollback:
     The JSON/file store is never modified — this is purely additive.
 """
 
+import os
 import sys
 from pathlib import Path
+
+if sys.platform == "win32":
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

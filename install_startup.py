@@ -1,131 +1,170 @@
 # install_startup.py
 """
-Installs JARVIS MK37 into the Windows auto-startup folder.
-Creates a VBScript launcher that runs silently (no CMD flash) on login.
+Installs BR JARVIS MK37 into auto-startup on Linux and Windows.
+- On Linux: Creates XDG Autostart entry (~/.config/autostart/br-jarvis.desktop)
+  and systemd user service (~/.config/systemd/user/br-jarvis.service).
+- On Windows: Creates silent VBScript launcher in Windows Startup folder.
 
 Usage:
-    python install_startup.py            # Install auto-startup
-    python install_startup.py --remove   # Remove auto-startup
-    python install_startup.py --status   # Check if installed
+    python3 install_startup.py            # Install auto-startup
+    python3 install_startup.py --remove   # Remove auto-startup
+    python3 install_startup.py --status   # Check if installed
 """
-
 import os
 import sys
+import platform
+import subprocess
 from pathlib import Path
 
-
-def get_startup_folder() -> Path:
-    """Get the Windows Startup folder path. Returns empty path on non-Windows."""
-    if sys.platform != "win32":
-        return Path("/dev/null")
-    startup = Path(os.environ.get(
-        "APPDATA", Path.home() / "AppData" / "Roaming"
-    )) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-    return startup
+_OS = platform.system()
 
 
 def get_project_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
-def install():
-    """Install JARVIS MK37 to Windows startup using a silent VBScript launcher."""
-    if sys.platform != "win32":
-        print("[ERROR] Auto-startup installer is only supported on Windows.")
-        sys.exit(1)
+def install_linux():
+    project_dir = get_project_dir()
+    py_exec = sys.executable
+    start_py = project_dir / "start.py"
 
-    startup_dir = get_startup_folder()
+    # 1. Create XDG Autostart entry
+    autostart_dir = Path.home() / ".config" / "autostart"
+    autostart_dir.mkdir(parents=True, exist_ok=True)
+    desktop_file = autostart_dir / "br-jarvis.desktop"
+
+    desktop_content = f"""[Desktop Entry]
+Type=Application
+Name=BR JARVIS MK37
+Comment=BR JARVIS Autonomous AI Engine
+Exec={py_exec} {start_py} voice
+Path={project_dir}
+Terminal=false
+Categories=Utility;Automation;
+X-GNOME-Autostart-enabled=true
+"""
+    desktop_file.write_text(desktop_content, encoding="utf-8")
+
+    # 2. Create Systemd user service
+    systemd_dir = Path.home() / ".config" / "systemd" / "user"
+    systemd_dir.mkdir(parents=True, exist_ok=True)
+    service_file = systemd_dir / "br-jarvis.service"
+
+    service_content = f"""[Unit]
+Description=BR JARVIS Autonomous AI Core Daemon
+After=network.target sound.target
+
+[Service]
+Type=simple
+WorkingDirectory={project_dir}
+ExecStart={py_exec} {start_py} server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+"""
+    service_file.write_text(service_content, encoding="utf-8")
+
+    # Enable systemd user service if systemctl is available
+    try:
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+        subprocess.run(["systemctl", "--user", "enable", "br-jarvis.service"], capture_output=True)
+    except Exception:
+        pass
+
+    print("=" * 55)
+    print("  BR — Auto-Startup Installed (Linux)")
+    print("=" * 55)
+    print(f"  Desktop Autostart : {desktop_file}")
+    print(f"  Systemd User Service : {service_file}")
+    print(f"  Project Dir         : {project_dir}")
+    print()
+    print("  BR JARVIS will now start automatically when you log in.")
+    print("=" * 55)
+
+
+def install_windows():
+    startup_dir = Path(os.environ.get(
+        "APPDATA", Path.home() / "AppData" / "Roaming"
+    )) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
     project_dir = get_project_dir()
     bat_source = project_dir / "startup.bat"
 
-    if not bat_source.exists():
-        print(f"[ERROR] startup.bat not found at {bat_source}")
-        sys.exit(1)
-
-    if not startup_dir.exists():
-        print(f"[ERROR] Startup folder not found at {startup_dir}")
-        sys.exit(1)
-
-    # Create VBScript for silent launch (no CMD flash on login)
-    vbs_file = startup_dir / "JARVIS_MK37.vbs"
+    vbs_file = startup_dir / "BR.vbs"
     vbs_content = (
         f'Set WShell = CreateObject("WScript.Shell")\n'
         f'WShell.CurrentDirectory = "{project_dir}"\n'
         f'WShell.Run """{bat_source}"" --silent", 0, False\n'
     )
 
-    # Also create a fallback .bat in case VBS is blocked by policy
-    bat_file = startup_dir / "JARVIS_MK37.bat"
+    bat_file = startup_dir / "BR.bat"
     bat_content = (
         f'@echo off\r\n'
         f'start "" /D "{project_dir}" /MIN "{bat_source}" --silent\r\n'
     )
 
-    try:
-        vbs_file.write_text(vbs_content, encoding="utf-8")
-        bat_file.write_text(bat_content, encoding="utf-8")
+    for legacy in ("JARVIS_MK37.vbs", "JARVIS_MK37.bat"):
+        legacy_file = startup_dir / legacy
+        if legacy_file.exists():
+            legacy_file.unlink()
 
-        print("=" * 55)
-        print("  JARVIS MK37 — Auto-Startup Installed")
-        print("=" * 55)
-        print(f"  VBS Launcher: {vbs_file}")
-        print(f"  BAT Fallback: {bat_file}")
-        print(f"  Project Dir:  {project_dir}")
-        print()
-        print("  JARVIS will now start automatically when you log in.")
-        print("  It launches the Voice Assistant in silent mode.")
-        print()
-        print("  To remove: python install_startup.py --remove")
-        print("  To check:  python install_startup.py --status")
-        print("=" * 55)
-    except PermissionError:
-        print(f"[ERROR] Permission denied writing to {startup_dir}")
-        print(f"        Try running: python install_startup.py")
-        print(f"        Or manually copy startup.bat to:")
-        print(f"        {startup_dir}")
-        sys.exit(1)
+    vbs_file.write_text(vbs_content, encoding="utf-8")
+    bat_file.write_text(bat_content, encoding="utf-8")
+
+    print("=" * 55)
+    print("  BR — Auto-Startup Installed (Windows)")
+    print("=" * 55)
+    print(f"  VBS Launcher: {vbs_file}")
+    print(f"  BAT Fallback: {bat_file}")
+    print("=" * 55)
+
+
+def install():
+    if _OS == "Linux":
+        install_linux()
+    else:
+        install_windows()
 
 
 def remove():
-    """Remove JARVIS MK37 from Windows startup."""
-    startup_dir = get_startup_folder()
-    removed = []
-
-    for name in ("JARVIS_MK37.vbs", "JARVIS_MK37.bat"):
-        f = startup_dir / name
-        if f.exists():
-            f.unlink()
-            removed.append(str(f))
-
-    if removed:
-        print("[OK] JARVIS MK37 auto-startup removed.")
-        for r in removed:
-            print(f"     Deleted: {r}")
+    if _OS == "Linux":
+        desktop_file = Path.home() / ".config" / "autostart" / "br-jarvis.desktop"
+        service_file = Path.home() / ".config" / "systemd" / "user" / "br-jarvis.service"
+        if desktop_file.exists():
+            desktop_file.unlink()
+        if service_file.exists():
+            service_file.unlink()
+        try:
+            subprocess.run(["systemctl", "--user", "disable", "br-jarvis.service"], capture_output=True)
+        except Exception:
+            pass
+        print("[OK] BR Linux auto-startup removed.")
     else:
-        print("[INFO] No auto-startup entry found.")
+        startup_dir = Path(os.environ.get(
+            "APPDATA", Path.home() / "AppData" / "Roaming"
+        )) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+        for name in ("BR.vbs", "BR.bat", "JARVIS_MK37.vbs", "JARVIS_MK37.bat"):
+            f = startup_dir / name
+            if f.exists():
+                f.unlink()
+        print("[OK] BR Windows auto-startup removed.")
 
 
 def status():
-    """Check if JARVIS MK37 is installed in auto-startup."""
-    startup_dir = get_startup_folder()
-    vbs = startup_dir / "JARVIS_MK37.vbs"
-    bat = startup_dir / "JARVIS_MK37.bat"
-
     print("=" * 50)
-    print("  JARVIS MK37 — Auto-Startup Status")
+    print(f"  BR — Auto-Startup Status ({_OS})")
     print("=" * 50)
-    print(f"  Startup folder: {startup_dir}")
-    print(f"  VBS launcher:   {'INSTALLED' if vbs.exists() else 'not found'}")
-    print(f"  BAT fallback:   {'INSTALLED' if bat.exists() else 'not found'}")
-    print(f"  Project dir:    {get_project_dir()}")
-    print(f"  startup.bat:    {'EXISTS' if (get_project_dir() / 'startup.bat').exists() else 'MISSING'}")
-    print("=" * 50)
-
-    if vbs.exists() or bat.exists():
-        print("  Status: ACTIVE — JARVIS will start on login")
+    if _OS == "Linux":
+        desktop_file = Path.home() / ".config" / "autostart" / "br-jarvis.desktop"
+        service_file = Path.home() / ".config" / "systemd" / "user" / "br-jarvis.service"
+        print(f"  Desktop entry: {'INSTALLED' if desktop_file.exists() else 'not found'}")
+        print(f"  Systemd service: {'INSTALLED' if service_file.exists() else 'not found'}")
     else:
-        print("  Status: NOT INSTALLED")
-        print("  Run: python install_startup.py")
+        startup_dir = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+        vbs = startup_dir / "BR.vbs"
+        print(f"  Windows VBS: {'INSTALLED' if vbs.exists() else 'not found'}")
+    print("=" * 50)
 
 
 if __name__ == "__main__":

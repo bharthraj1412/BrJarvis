@@ -1,5 +1,5 @@
 @echo off
-title JARVIS MK37
+title BR
 cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 
@@ -23,16 +23,16 @@ if "%ERRORLEVEL%" NEQ "0" (
 
 :: Silent mode (auto-startup) - launch voice assistant directly, no menu
 if "%~1"=="--silent" (
-    echo [JARVIS] Auto-startup - launching voice assistant...
-    python start.py voice
+    echo [BR] Auto-startup - launching web server...
+    python start.py webserver
     goto :end
 )
 
 :: Voice-safe mode: run audio diagnostics first, then voice assistant
 if "%~1"=="--voice-safe" (
-    echo [JARVIS] Running audio diagnostics...
+    echo [BR] Running audio diagnostics...
     python start.py audio
-    echo [JARVIS] Launching voice assistant...
+    echo [BR] Launching voice assistant...
     python start.py voice
     goto :end
 )
@@ -46,7 +46,7 @@ if "%~1" NEQ "" (
 :: Interactive mode - show the launcher menu
 echo.
 echo ========================================
-echo   J.A.R.V.I.S  MARK XXXVII  LAUNCHER
+echo         B.R  LAUNCHER
 echo ========================================
 echo.
 python start.py
@@ -55,7 +55,7 @@ python start.py
 :: Keep window open if it crashes
 if "%ERRORLEVEL%" NEQ "0" (
     echo.
-    echo [ERROR] JARVIS MK37 exited with code %ERRORLEVEL%
+    echo [ERROR] BR exited with code %ERRORLEVEL%
     echo Press any key to close...
     pause >nul
 )

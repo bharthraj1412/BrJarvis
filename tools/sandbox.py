@@ -27,7 +27,8 @@ class CodeSandbox:
             # Try Git Bash or WSL, otherwise fall back to powershell hint
             pass  # still try — Git Bash may be installed
         if lang == "powershell" and _OS != "Windows":
-            return {"error": "PowerShell is only available on Windows"}
+            if not __import__("shutil").which("pwsh"):
+                return {"error": "PowerShell (pwsh) is not installed on this system"}
 
         with tempfile.NamedTemporaryFile(
             suffix=self._ext(lang), mode="w", delete=False, encoding="utf-8"
@@ -64,9 +65,10 @@ class CodeSandbox:
         }[lang]
 
     def _cmd(self, lang, f):
+        ps_bin = "powershell" if _OS == "Windows" else "pwsh"
         return {
             "python": [sys.executable, f],       # always use the current Python
             "javascript": ["node", f],
             "bash": ["bash", f],
-            "powershell": ["powershell", "-ExecutionPolicy", "Bypass", "-File", f],
+            "powershell": [ps_bin, "-ExecutionPolicy", "Bypass", "-File", f] if _OS == "Windows" else [ps_bin, "-File", f],
         }[lang]

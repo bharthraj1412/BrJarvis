@@ -32,7 +32,7 @@ from playwright.async_api import (
 )
 
 # ── Platform ──────────────────────────────────────────────────────────────────
-_OS = platform.system()   # "Windows" | "Darwin" | "Linux"
+_OS = platform.system()
 
 
 # ── URL normalizer ────────────────────────────────────────────────────────────

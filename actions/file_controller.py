@@ -10,7 +10,7 @@ try:
 except ImportError:
     _SEND2TRASH = False
 
-_OS = platform.system()  # "Windows" | "Darwin" | "Linux"
+_OS = platform.system()
 
 _SAFE_ROOTS: list[Path] = [
     Path.home(),

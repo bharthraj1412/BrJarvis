@@ -9,7 +9,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)]()
-[![Tools](https://img.shields.io/badge/Tools-43-orange)]()
+[![Tools](https://img.shields.io/badge/Tools-47-orange)]()
 [![Skills](https://img.shields.io/badge/Skills-45-purple)]()
 [![Agents](https://img.shields.io/badge/Sub--Agents-8-red)]()
 
@@ -26,14 +26,10 @@
 - [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
 - [Usage](#-usage)
-- [Tool Registry (43 Tools)](#-tool-registry-43-tools)
+- [Tool Registry (47 Tools)](#-tool-registry-47-tools)
 - [Skill Library (45 Skills)](#-skill-library-45-skills)
 - [Sub-Agent System (8 Agents)](#-sub-agent-system-8-agents)
-- [Memory & Persistence](#-memory--persistence)
-- [Red Team & Security](#-red-team--security)
-- [Screen Sharing](#-screen-sharing)
-- [Configuration](#-configuration)
-- [Contributing](#-contributing)
+ [Developer Walkthrough](#-developer-walkthrough)
 
 ---
 
@@ -44,7 +40,7 @@
 - **Voice Interface** — Real-time conversation via Gemini Live with native audio I/O
 - **CLI Orchestrator** — ReAct-loop terminal for chained, autonomous multi-step task execution
 - **Multi-Backend Routing** — Intelligent dispatch across 6 LLM providers (Gemini, Anthropic, OpenAI, Mistral, NVIDIA NIM, Ollama)
-- **43 Deterministic Tools** — From web search and code sandboxing to red-team recon and full desktop automation
+- **47 Deterministic Tools** — From web search and code sandboxing to red-team recon and full desktop automation
 - **45 Reusable Skills** — Professional prompt templates for DevOps, security, data analysis, and more
 - **8 Sub-Agent Types** — Spawn isolated worker agents for parallel, specialized workflows
 - **Persistent Memory** — ChromaDB vector embeddings + SQLite session history with semantic linking
@@ -87,7 +83,7 @@ Whether you're automating DevSecOps workflows, controlling your desktop by voice
 │Gemini│Claude│GPT │Mistrl│NVIDIA│ Ollama (offline)       │
 ├─────┴─────┴─────┴─────┴─────┴───────────────────────────┤
 │                tools/registry.py                        │
-│            43 tools · _run_async() helper               │
+│            47 tools · _run_async() helper               │
 ├──────────────┬──────────────┬───────────────────────────┤
 │  actions/    │  redteam/    │  multi_agent/             │
 │  18 modules  │  scope+recon │  8 agent types            │
@@ -166,13 +162,11 @@ playwright install
 
 > **💡 Minimum requirement:** Only a Gemini API key is needed. All other backends are optional and degrade gracefully.
 
----
 
 ## 🎯 Usage
 
 ### Option 1: Voice Interface
 
-```bash
 python main.py
 ```
 
@@ -182,15 +176,6 @@ Opens a native GUI with real-time voice conversation powered by Gemini Live. Fea
 - Full tool execution via voice commands
 - Real-time output/input transcription logging
 
-### Option 2: CLI Orchestrator
-
-```bash
-python main_mk37.py
-```
-
-A rich terminal interface with the ReAct (Reason + Act) loop for autonomous multi-step task execution. Slash commands:
-
-| Command | Description |
 |---|---|
 | `/skills` | List all available skills |
 | `/memory` | Browse persistent memories |
@@ -207,9 +192,17 @@ python install_startup.py
 
 Installs a silent background launcher that starts JARVIS automatically on Windows login.
 
+### Option 4: Startup Smoke Checks
+
+```bash
+python start.py smoke
+```
+
+Runs non-destructive checks for permissions, router fallback behavior, skills, tools, and scope config.
+
 ---
 
-## 🔧 Tool Registry (43 Tools)
+## 🔧 Tool Registry (47 Tools)
 
 ### Web & Search
 | Tool | Description |
@@ -408,8 +401,10 @@ JARVIS maintains full context between sessions through a layered memory system:
 | Mode | Behavior |
 |---|---|
 | `ALLOW_ALL` | All tools execute immediately (default) |
-| `CONFIRM_ALL` | User approval required for each tool |
-| `DENY_LIST` | Block specific tools via `JARVIS_DENY_TOOLS` env var |
+| `CONFIRM_ALL` | Only `ALWAYS_ALLOWED` safe tools execute without prompt |
+| `DENY_ALL` | Block all tools except explicit allow-list |
+
+Mode is set through `JARVIS_PERMISSION_MODE` and can also be sourced from `current_scope.json` (`permissions.mode`, `deny_tools`, `allow_tools`).
 
 ### Scope Enforcement
 - Defined in `current_scope.json`

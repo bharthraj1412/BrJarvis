@@ -16,6 +16,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, TextIO, TypedDict, cast
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Fix terminal encoding issues on Windows
 if sys.platform == "win32":
     os.environ["PYTHONIOENCODING"] = "utf-8"
@@ -44,8 +50,8 @@ except ImportError:
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-VERSION = "37.1.0"
-BUILD   = "2026-04-21"
+VERSION = "37.2.0"
+BUILD   = "2026-07-20"
 CODENAME = "MARK XXXVII"
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -59,8 +65,8 @@ def _banner():
     console.clear()
     now = datetime.now().strftime("%A, %B %d, %Y — %I:%M %p")
     text = Text(justify="center")
-    text.append("\nJ.A.R.V.I.S  —  MARK XXXVII\n", style="bold cyan")
-    text.append("Just A Rather Very Intelligent System\n\n", style="dim")
+    text.append("\nBR Jarvis  —  SYSTEM CORE\n", style="bold cyan")
+    text.append("Cognitive Neural Assistant\n\n", style="dim")
     text.append(f"Version: {VERSION} | Build: {BUILD}\n", style="bold green")
     text.append(f"Python: {sys.version.split()[0]} | Platform: {platform.system()}\n", style="green")
     text.append(now, style="dim")
@@ -120,7 +126,9 @@ def _check_module(name: str) -> tuple[bool, str]:
         mod = importlib.import_module(name)
         ver = getattr(mod, "__version__", "OK")
         return True, str(ver)
-    except ImportError as e:
+    except Exception as e:
+        if "DisplayConnectionError" in type(e).__name__ or "display" in str(e).lower():
+            return True, f"Installed ({type(e).__name__})"
         return False, str(e)
 
 # ── Health Diagnostic Command ─────────────────────────────────────────────────
@@ -177,12 +185,13 @@ def show_status():
     try:
         sys.path.insert(0, str(BASE_DIR))
         from skills import load_skills
-        table_sys.add_row("[green]✓ Skills Loaded[/]", str(len(load_skills())))
+        table_sys.add_row("[green]✓ Skills Loaded[/]", str(len([s for s in load_skills() if s.user_invocable])))
         
         from multi_agent.subagent import load_agent_definitions
         table_sys.add_row("[green]✓ Agent Types[/]", str(len(load_agent_definitions())))
         
-        from tools.registry import TOOL_SCHEMAS  # pyright: ignore[reportUnknownVariableType]
+        from tools.registry import TOOL_SCHEMAS, _import_plugins
+        _import_plugins()
         tool_schemas = cast(list[dict[str, Any]], TOOL_SCHEMAS)
         table_sys.add_row("[green]✓ Tools Registered[/]", str(len(tool_schemas)))
     except Exception:
@@ -210,55 +219,194 @@ def show_status():
 
 def doctor():
     _banner()
-    console.print("[bold magenta]JARVIS Doctor — Dependency Fix[/]\n")
+    console.print("[bold magenta]JARVIS MK37 System Doctor & Auto-Repair Engine[/]\n")
 
-    required: dict[str, str] = {
+    # 1. Python Libraries Audit
+    python_dependencies: dict[str, str] = {
         "google-genai": "google.genai",
+        "openai": "openai",
+        "fastapi": "fastapi",
+        "uvicorn": "uvicorn",
+        "rich": "rich",
+        "psutil": "psutil",
         "sounddevice": "sounddevice",
+        "SpeechRecognition": "speech_recognition",
+        "pyperclip": "pyperclip",
+        "pyautogui": "pyautogui",
+        "pyyaml": "yaml",
+        "Pillow": "PIL",
+        "mss": "mss",
+        "edge-tts": "edge_tts",
+        "numpy": "numpy",
+        "opencv-python": "cv2",
         "requests": "requests",
         "httpx": "httpx",
-        "Pillow": "PIL",
-        "numpy": "numpy",
-        "psutil": "psutil",
+        "duckduckgo-search": "duckduckgo_search",
+        "beautifulsoup4": "bs4",
+        "playwright": "playwright",
+        "youtube-transcript-api": "youtube_transcript_api",
     }
     
-    missing: list[str] = []
+    missing_pip: list[str] = []
     
-    table = Table(title="Required Dependencies", box=None)
-    table.add_column("Package", style="bold")
-    table.add_column("Status")
+    table_pip = Table(title="1. Python Packages Audit", box=None)
+    table_pip.add_column("Package Name", style="bold cyan")
+    table_pip.add_column("Import Identifier", style="dim")
+    table_pip.add_column("Status")
     
-    for pip_name, import_name in required.items():
+    for pip_name, import_name in python_dependencies.items():
         ok, ver = _check_module(import_name)
         if ok:
-            table.add_row(pip_name, f"[green]✓ Installed[/] [dim]({ver})[/]")
+            table_pip.add_row(pip_name, import_name, f"[green]✓ Installed[/] [dim]({ver})[/]")
         else:
-            table.add_row(pip_name, "[red]✗ MISSING[/]")
-            missing.append(pip_name)
+            table_pip.add_row(pip_name, import_name, "[red]✗ MISSING[/]")
+            missing_pip.append(pip_name)
             
-    console.print(table)
+    console.print(table_pip)
     console.print()
+
+    # 2. System CLI Tools Audit (Linux/macOS/Windows)
+    import shutil
+    cli_tools = {
+        "C Compiler (gcc/clang)": ["gcc", "clang"],
+        "GUI Automation Tools": ["xdotool", "xrandr"],
+        "Screenshot Utilities": ["scrot", "import", "grim"],
+        "Audio Engines": ["espeak-ng", "spd-say", "pw-play", "paplay", "aplay"],
+        "FFmpeg Engine": ["ffmpeg"],
+    }
     
-    if not missing:
-        console.print("[bold green]System is healthy. All dependencies met.[/]")
+    table_sys = Table(title="2. System Environment & CLI Tools Audit", box=None)
+    table_sys.add_column("Tool Group", style="bold yellow")
+    table_sys.add_column("Found Binary", style="dim")
+    table_sys.add_column("Status")
+    
+    missing_sys_groups = []
+    for group_name, bin_list in cli_tools.items():
+        found = None
+        for b in bin_list:
+            if shutil.which(b):
+                found = b
+                break
+        if found:
+            table_sys.add_row(group_name, found, "[green]✓ Available[/]")
+        else:
+            table_sys.add_row(group_name, "None", "[yellow]⚠ Missing (Optional Fallback)[/]")
+            missing_sys_groups.append(group_name)
+
+    console.print(table_sys)
+    console.print()
+
+    # 3. Native C Extension Audit
+    native_lib_path = BASE_DIR / "native" / ("libjarvis_native.dll" if sys.platform == "win32" else "libjarvis_native.so")
+    native_ok = False
+    try:
+        from core.native_bridge import get_status
+        st = get_status()
+        native_ok = st.get("active", False)
+    except Exception:
+        pass
+
+    console.print("[bold cyan]3. Native C Hardware Extension Audit[/]")
+    if native_ok:
+        console.print(f"  [green]✓ Low-Latency C Shared Library Active:[/] {native_lib_path.name}")
+    else:
+        console.print(f"  [yellow]⚠ Native C Library missing or not compiled:[/] {native_lib_path}")
+    console.print()
+
+    # 4. Storage & Configuration Audit
+    console.print("[bold cyan]4. Workspace & Directory Audit[/]")
+    dirs_to_check = [
+        BASE_DIR / "logs",
+        Path.home() / ".jarvis" / "memory",
+        BASE_DIR / "config",
+        BASE_DIR / "native"
+    ]
+    for d in dirs_to_check:
+        d.mkdir(parents=True, exist_ok=True)
+        console.print(f"  [green]✓ Directory Verified:[/] [dim]{d}[/]")
+
+    api_key_file = BASE_DIR / "config" / "api_keys.json"
+    env_file = BASE_DIR / ".env"
+    if not api_key_file.exists():
+        api_key_file.parent.mkdir(parents=True, exist_ok=True)
+        api_key_file.write_text(json.dumps({"gemini_api_key": os.environ.get("GEMINI_API_KEY", "")}, indent=2), encoding="utf-8")
+        console.print(f"  [green]✓ Initialized API key config:[/] {api_key_file.name}")
+    if not env_file.exists() and (BASE_DIR / ".env.template").exists():
+        shutil.copy(BASE_DIR / ".env.template", env_file)
+        console.print(f"  [green]✓ Created default .env from template[/]")
+
+    console.print()
+
+    # 5. Fix & Auto-Repair Phase
+    if not missing_pip and native_ok:
+        console.print("[bold green]========================================================[/]")
+        console.print("[bold green]  DOCTOR DIAGNOSIS: SYSTEM IS 100% HEALTHY & OPERATIONAL!  [/]")
+        console.print("[bold green]========================================================[/]")
         return
-        
-    console.print(f"[bold red]{len(missing)} required packages missing.[/]")
-    if Prompt.ask("Install missing packages now?", choices=["y", "n"], default="y") == "y":
-        console.print("\nInstalling...")
-        for pkg in missing:
-            console.print(f"  [dim]Installing[/] {pkg}...")
-            result = subprocess.run([PYTHON, "-m", "pip", "install", pkg, "--quiet"], capture_output=True)
-            if result.returncode == 0:
-                console.print(f"  [green]✓ {pkg} installed[/]")
+
+    console.print("[bold yellow]System Repair Needed. Beginning automatic remediation...[/]\n")
+
+    # Fix Python Packages
+    if missing_pip:
+        console.print(f"[bold yellow]Found {len(missing_pip)} missing Python packages.[/]")
+        if Prompt.ask("Install missing Python dependencies now?", choices=["y", "n"], default="y") == "y":
+            for pkg in missing_pip:
+                console.print(f"  [dim]Installing {pkg}...[/]", end=" ")
+                res = subprocess.run([PYTHON, "-m", "pip", "install", pkg, "--quiet"], capture_output=True)
+                if res.returncode != 0:
+                    res = subprocess.run([PYTHON, "-m", "pip", "install", pkg, "--break-system-packages", "--quiet"], capture_output=True)
+                if res.returncode == 0:
+                    console.print("[green]DONE[/]")
+                else:
+                    console.print("[red]FAILED[/]")
+
+            # Install Playwright browser binaries
+            try:
+                subprocess.run([PYTHON, "-m", "playwright", "install", "chromium"], capture_output=True, timeout=60)
+            except Exception:
+                pass
+
+    # Compile Native C Library
+    if not native_ok:
+        console.print("\n[bold yellow]Compiling C Native Shared Extension...[/]")
+        try:
+            setup_script = BASE_DIR / "setup_native.py"
+            res = subprocess.run([PYTHON, str(setup_script)], cwd=str(BASE_DIR), capture_output=True, text=True)
+            if res.returncode == 0:
+                console.print("  [green]✓ C Native Library compiled successfully![/]")
             else:
-                console.print(f"  [red]✗ Failed to install {pkg}[/]")
-        console.print("\n[bold green]Scan complete.[/]")
+                console.print(f"  [yellow]⚠ Native C compilation note: {res.stderr.strip() or 'Using Python fallbacks'}[/]")
+        except Exception as e:
+            console.print(f"  [yellow]⚠ Native C build note: {e}[/]")
+
+    # System Linux setup script offer
+    if sys.platform == "linux" and missing_sys_groups:
+        setup_sh = BASE_DIR / "setup_linux.sh"
+        if setup_sh.exists():
+            if Prompt.ask("\nRun system package installer (setup_linux.sh) for system dependencies?", choices=["y", "n"], default="y") == "y":
+                subprocess.run(["bash", str(setup_sh)], cwd=str(BASE_DIR))
+
+    console.print("\n[bold green]Doctor auto-repair sequence completed![/]")
 
 # ── Process Execution ─────────────────────────────────────────────────────────
 
 def _ensure_log_dir():
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+def _run_script(script_name: str, entry_func):
+    """Run a sub-script either via subprocess or direct import if frozen."""
+    if getattr(sys, "frozen", False):
+        try:
+            entry_func()
+        except KeyboardInterrupt:
+            pass
+        except Exception as e:
+            console.print(f"[red]Error running {script_name} in-process: {e}[/]")
+    else:
+        try:
+            subprocess.run([PYTHON, str(BASE_DIR / script_name)], cwd=str(BASE_DIR))
+        except KeyboardInterrupt:
+            pass
 
 def _write_pid(pid: int, mode: str):
     try:
@@ -281,98 +429,85 @@ def _pre_launch_check() -> bool:
     return True
 
 def launch_voice():
-    console.print("\n[bold cyan]▶ Starting Voice Assistant (Gemini Live GUI)[/]")
+    console.print("\n[bold cyan]▶ Starting BR Voice Assistant[/]")
     console.print("[dim]Note: The GUI will open in a new window. Press Ctrl+C to stop.[/]\n")
-    try: subprocess.run([PYTHON, str(BASE_DIR / "main.py")], cwd=str(BASE_DIR))
-    except KeyboardInterrupt: console.print("\n[dim]Voice assistant stopped.[/]")
+    from main import main as voice_main
+    _run_script("main.py", voice_main)
 
 def launch_cli():
     console.print("\n[bold cyan]▶ Starting CLI Orchestrator[/]")
     console.print("[dim]Type /quit to exit.[/]\n")
-    try: subprocess.run([PYTHON, str(BASE_DIR / "main_mk37.py")], cwd=str(BASE_DIR))
-    except KeyboardInterrupt: console.print("\n[dim]CLI stopped.[/]")
+    from main_mk37 import main as cli_main
+    _run_script("main_mk37.py", cli_main)
 
-def launch_screen_share():
-    console.print("\n[bold cyan]▶ Starting Screen Share Server[/]")
-    viewer_path = BASE_DIR / "screen_server" / "viewer.html"
-    console.print(f"  [green]Server Running on[/] ws://localhost:8765")
-    console.print(f"  [green]Viewer Interface[/]  Access [cyan]file:///{viewer_path}[/]")
+def launch_web_server():
+    console.print("\n[bold cyan]▶ Starting BR Web Core Server[/]")
+    console.print(f"  [green]Server Running on[/] http://localhost:8000")
+    console.print(f"  [green]Dashboard Interface[/] Access [cyan]http://localhost:8000[/]")
     console.print("[dim]Press Ctrl+C to shut down.[/]\n")
-    try: subprocess.run([PYTHON, str(BASE_DIR / "screen_server" / "ws_server.py")], cwd=str(BASE_DIR))
-    except KeyboardInterrupt: console.print("\n[dim]Screen Share shutdown.[/]")
+    from server import main as server_main
+    _run_script("server.py", server_main)
 
 def launch_both():
     console.print("\n[bold cyan]▶ Starting Modes in Parallel[/]\n")
-    _ensure_log_dir()
-    voice_log = LOG_DIR / f"voice_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-
-    log_handle: TextIO = open(voice_log, "w", encoding="utf-8")
-    if sys.platform == "win32":
-        vproc = subprocess.Popen(
-            [PYTHON, str(BASE_DIR / "main.py")],
-            cwd=str(BASE_DIR),
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-        )
+    if getattr(sys, "frozen", False):
+        from main import main as voice_main
+        from main_mk37 import main as cli_main
+        threading.Thread(target=voice_main, daemon=True).start()
+        cli_main()
     else:
-        vproc = subprocess.Popen(
-            [PYTHON, str(BASE_DIR / "main.py")],
-            cwd=str(BASE_DIR),
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-        )
-    console.print(f"  [green]✓ Voice GUI Started[/] (PID: {vproc.pid})")
-    console.print(f"    [dim]Logs: {voice_log}[/]")
-    _write_pid(vproc.pid, "voice+cli")
-    
-    console.print("\n  [cyan]Launching CLI...[/]\n")
-    try: subprocess.run([PYTHON, str(BASE_DIR / "main_mk37.py")], cwd=str(BASE_DIR))
-    except KeyboardInterrupt: console.print("\n[dim]CLI closed.[/]")
-    finally:
-        console.print(f"  [dim]Shutting down Voice GUI (PID: {vproc.pid})...[/]", end=" ")
+        _ensure_log_dir()
+        voice_log = LOG_DIR / f"voice_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        log_handle = open(voice_log, "w", encoding="utf-8")
         try:
-            vproc.terminate()
-            vproc.wait(timeout=5)
-            console.print("[green]Done.[/]")
-        except subprocess.TimeoutExpired:
-            vproc.kill()
-            console.print("[yellow]Force Killed.[/]")
-        except Exception:
-            console.print("[dim]Ignored.[/]")
-        _clear_pid()
-        try:
+            vproc = subprocess.Popen(
+                [PYTHON, str(BASE_DIR / "main.py")],
+                cwd=str(BASE_DIR),
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+            )
+            console.print(f"  [green]✓ Voice GUI Started[/] (PID: {vproc.pid})")
+            console.print(f"    [dim]Logs: {voice_log}[/]")
+            _write_pid(vproc.pid, "voice+cli")
+            
+            console.print("\n  [cyan]Launching CLI...[/]\n")
+            try: subprocess.run([PYTHON, str(BASE_DIR / "main_mk37.py")], cwd=str(BASE_DIR))
+            except KeyboardInterrupt: console.print("\n[dim]CLI closed.[/]")
+            finally:
+                console.print(f"  [dim]Shutting down Voice GUI (PID: {vproc.pid})...[/]", end=" ")
+                try:
+                    vproc.terminate()
+                    vproc.wait(timeout=5)
+                    console.print("[green]Done.[/]")
+                except Exception:
+                    try: vproc.kill()
+                    except Exception: pass
+                    console.print("[yellow]Force Killed.[/]")
+                _clear_pid()
+        finally:
             log_handle.close()
-        except Exception:
-            pass
 
 def launch_silent():
-    _ensure_log_dir()
-    voice_log = LOG_DIR / f"voice_silent_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-    try:
-        log_handle: TextIO = open(voice_log, "w", encoding="utf-8")
-        if sys.platform == "win32":
-            proc = subprocess.Popen(
-                [PYTHON, str(BASE_DIR / "main.py")],
-                cwd=str(BASE_DIR),
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-            )
-        else:
-            proc = subprocess.Popen(
-                [PYTHON, str(BASE_DIR / "main.py")],
-                cwd=str(BASE_DIR),
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
-            )
-        _write_pid(proc.pid, "silent")
+    if getattr(sys, "frozen", False):
+        from server import main as server_main
+        server_main()
+    else:
+        _ensure_log_dir()
+        voice_log = LOG_DIR / f"voice_silent_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         try:
+            log_handle = open(voice_log, "w", encoding="utf-8")
+            proc = subprocess.Popen(
+                [PYTHON, str(BASE_DIR / "main.py")],
+                cwd=str(BASE_DIR),
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+            )
+            _write_pid(proc.pid, "silent")
             log_handle.close()
         except Exception:
             pass
-    except Exception:
-        pass
 
 
 def launch_smoke():
@@ -389,13 +524,13 @@ def launch_smoke():
 
 def show_audio_status():
     _banner()
-    console.print("[bold cyan]Audio Diagnostics[/]\n")
+    console.print("[bold cyan]JARVIS Hardware Audio Diagnostics & Signal Meter[/]\n")
     try:
         import sounddevice as sd
         devices = sd.query_devices()
         default_in, default_out = sd.default.device
 
-        table = Table(title="Audio Devices", title_style="bold magenta", box=None)
+        table = Table(title="Audio Hardware Devices", title_style="bold magenta", box=None)
         table.add_column("Idx", style="bold cyan")
         table.add_column("Type", style="bold")
         table.add_column("Name")
@@ -412,14 +547,38 @@ def show_audio_status():
             if out_ch > 0:
                 kind.append(f"OUT({out_ch})")
             is_default = (i == default_in) or (i == default_out)
-            table.add_row(str(i), " / ".join(kind), str(dev.get("name", "")), "*" if is_default else "")
+            table.add_row(str(i), " / ".join(kind), str(dev.get("name", "")), "[green]★ Default[/]" if is_default else "")
 
         console.print(table)
-        console.print("\n[dim]Override devices with env vars:[/]")
-        console.print("[dim]  JARVIS_AUDIO_INPUT_DEVICE=<index-or-name>[/]")
-        console.print("[dim]  JARVIS_AUDIO_OUTPUT_DEVICE=<index-or-name>[/]")
+
+        # Test Native Audio Signal RMS energy computation
+        try:
+            from core.native_bridge import audio_energy
+            sample_signal = [0.05, 0.2, -0.15, 0.4, -0.3, 0.1]
+            rms = audio_energy(sample_signal)
+            console.print(f"\n[green]✓ Native C Audio RMS Processor Active:[/] Test Signal RMS Energy = [cyan]{rms:.4f}[/]")
+        except Exception:
+            pass
+
+        console.print("\n[dim]Override audio devices with environment variables:[/]")
+        console.print("[dim]  export JARVIS_AUDIO_INPUT_DEVICE=<index-or-name>[/]")
+        console.print("[dim]  export JARVIS_AUDIO_OUTPUT_DEVICE=<index-or-name>[/]")
     except Exception as e:
         console.print(f"[red]✗ Audio diagnostics failed:[/] {e}")
+
+def launch_live_os():
+    _banner()
+    console.print("[bold cyan]Launching Live Autonomous OS Visual Controller ('Antigravity Mode')[/]\n")
+    goal = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else ""
+    if not goal:
+        goal = Prompt.ask("  [cyan]❯[/] Enter Live OS Control Goal")
+    if not goal:
+        console.print("[red]No goal specified.[/]")
+        return
+    from actions.live_os_control import live_os_control_action
+    res = live_os_control_action({"goal": goal})
+    console.print(f"\n[bold green]{res}[/]")
+
 
 # ── Main Entry ───────────────────────────────────────────────────────────────
 
@@ -436,39 +595,42 @@ def main():
         table.add_column("Action", style="bold")
         table.add_column("Desc", style="dim")
         
-        table.add_row("1", "VOICE", "Gemini Live Audio Graphical Interface")
+        table.add_row("1", "VOICE", "BR Hands-Free Voice Assistant")
         table.add_row("2", "CLI", "ReAct Terminal Interface (Multi Backend)")
         table.add_row("3", "BOTH", "Voice + CLI running simultaneously")
-        table.add_row("4", "SCREEN SHARE", "Launch WebSocket Monitor Tool")
+        table.add_row("4", "WEB CORE", "Launch Central Server and Web Interface")
         table.add_row("5", "STATUS", "Check AI configuration and module health")
         table.add_row("6", "DOCTOR", "Auto-install missing dependencies")
         table.add_row("7", "SMOKE", "Run non-destructive startup checks")
         table.add_row("8", "AUDIO", "List mic/speaker devices and defaults")
+        table.add_row("9", "LIVE OS", "Autonomous Live OS Visual Control ('Antigravity Mode')")
         
         console.print(Panel(table, title="[bold]Select Module Sequence[/]", expand=False))
         console.print()
         
-        choice = Prompt.ask("  [cyan]❯[/] Ready", choices=["1", "2", "3", "4", "5", "6", "7", "8"], default="1")
+        choice = Prompt.ask("  [cyan]❯[/] Ready", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9"], default="1")
         mode = {
             "1": "voice",
             "2": "cli",
             "3": "both",
-            "4": "screenshare",
+            "4": "webserver",
             "5": "status",
             "6": "doctor",
             "7": "smoke",
             "8": "audio",
+            "9": "live",
         }[choice]
 
     if mode in ("voice", "v", "gui"): launch_voice() if _pre_launch_check() else None
     elif mode in ("cli", "c", "terminal"): launch_cli() if _pre_launch_check() else None
     elif mode in ("both", "b", "all"): launch_both() if _pre_launch_check() else None
-    elif mode in ("screenshare", "s", "monitor"): launch_screen_share()
+    elif mode in ("webserver", "web", "server"): launch_web_server()
     elif mode in ("status", "health"): show_status()
     elif mode in ("doctor", "fix"): doctor()
     elif mode in ("silent",): launch_silent()
     elif mode in ("smoke", "check", "verify"): launch_smoke()
     elif mode in ("audio", "sound"): show_audio_status()
+    elif mode in ("live", "liveos", "os"): launch_live_os()
     else:
         console.print(f"[red]✗ Unknown launch argument provided.[/]")
         sys.exit(1)

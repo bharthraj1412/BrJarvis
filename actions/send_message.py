@@ -1,4 +1,5 @@
 import json
+import platform
 import subprocess
 import sys
 import time
@@ -9,13 +10,13 @@ try:
     pyautogui.FAILSAFE = True
     pyautogui.PAUSE    = 0.06
     _PYAUTOGUI = True
-except ImportError:
+except Exception:
     _PYAUTOGUI = False
 
 try:
     import pyperclip
     _PYPERCLIP = True
-except ImportError:
+except Exception:
     _PYPERCLIP = False
 
 def _base_dir() -> Path:
@@ -28,9 +29,9 @@ def _get_os() -> str:
         cfg = json.loads(
             (_base_dir() / "config" / "api_keys.json").read_text(encoding="utf-8")
         )
-        return cfg.get("os_system", "windows").lower()
+        return cfg.get("os_system", platform.system().lower()).lower()
     except Exception:
-        return "windows"
+        return platform.system().lower()
 
 
 def _require_pyautogui():

@@ -1,272 +1,200 @@
+# agent/planner.py — JARVIS MK37 Intelligent Task Planner
+"""
+AI-powered task planner using Gemini.
+Creates structured plans with dependency tracking and parallel execution support.
+"""
+from __future__ import annotations
+
 import json
 import re
 import sys
 from pathlib import Path
 
 
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
+def _get_gemini():
+    """Get GeminiBackend instance."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from gemini_backend import GeminiBackend
+    return GeminiBackend()
 
 
-BASE_DIR        = get_base_dir()
-API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
+PLANNER_PROMPT = """You are JARVIS MK37's intelligent planning module. Break complex goals into smart execution steps.
 
+AVAILABLE TOOLS:
+open_app          → launch any application (app_name)
+web_search        → search web for information (query, mode, items, aspect)
+game_updater      → Steam/Epic game management (action, platform, game_name)
+browser_control   → control web browser (action, url, query, text, description)
+file_controller   → file/folder operations (action, path, name, content, destination)
+computer_settings → OS-level controls: brightness, volume, wifi, dark mode, minimize/maximize (action, description, value)
+computer_control  → mouse/keyboard automation (action, text, x, y, keys, description)
+code_helper       → write/edit/run/build code (action, description, language, file_path)
+dev_agent         → build complete multi-file projects (description, language, project_name)
+send_message      → send messages via WhatsApp/Telegram/Discord (receiver, message_text, platform)
+reminder          → set reminders (date YYYY-MM-DD, time HH:MM, message)
+youtube_video     → play/summarize YouTube (action, query)
+weather_report    → get weather (city)
+screen_process    → analyze screen/camera (text, angle)
+desktop_control   → wallpaper/organize desktop (action, path, task)
+flight_finder     → search flights (origin, destination, date)
+agent_task        → complex multi-step autonomous task (goal, priority)
 
-PLANNER_PROMPT = """You are the planning module of MARK XXV, a personal AI assistant.
-Your job: break any user goal into a sequence of steps using ONLY the tools listed below.
+PLANNING RULES:
+1. Use MINIMUM steps — don't add unnecessary steps
+2. Steps can run in PARALLEL if they have no dependencies (use "parallel": true)
+3. Use "depends_on": [step_number] for sequential requirements
+4. Mark "critical": true for steps that MUST succeed
+5. Keep parameters clean and complete
+6. For game tasks: ALWAYS use game_updater, NEVER browser_control
+7. For information lookup: web_search, for current page: browser_control
+8. Max 8 steps per plan
 
-ABSOLUTE RULES:
-- NEVER use generated_code or write Python scripts. It does not exist.
-- NEVER reference previous step results in parameters. Every step is independent.
-- Use web_search for ANY information retrieval, research, or current data.
-- Use file_controller to save content to disk.
-- Max 5 steps. Use the minimum steps needed.
+PARALLEL EXECUTION EXAMPLES:
+- Searching multiple topics simultaneously
+- Opening multiple apps at once
+- Running independent operations
 
-AVAILABLE TOOLS AND THEIR PARAMETERS:
-
-open_app
-  app_name: string (required)
-
-web_search
-  query: string (required) — write a clear, focused search query
-  mode: "search" or "compare" (optional, default: search)
-  items: list of strings (optional, for compare mode)
-  aspect: string (optional, for compare mode)
-
-game_updater
-  action: "update" | "install" | "list" | "download_status" | "schedule" (required)
-  platform: "steam" | "epic" | "both" (optional, default: both)
-  game_name: string (optional)
-  app_id: string (optional)
-  shutdown_when_done: boolean (optional)
-
-browser_control
-  action: "go_to" | "search" | "click" | "type" | "scroll" | "get_text" | "press" | "close" (required)
-  url: string (for go_to)
-  query: string (for search)
-  text: string (for click/type)
-  direction: "up" | "down" (for scroll)
-
-file_controller
-  action: "write" | "create_file" | "read" | "list" | "delete" | "move" | "copy" | "find" | "disk_usage" (required)
-  path: string — use "desktop" for Desktop folder
-  name: string — filename
-  content: string — file content (for write/create_file)
-
-computer_settings
-  action: string (required)
-  description: string — natural language description
-  value: string (optional)
-
-computer_control
-  action: "type" | "click" | "hotkey" | "press" | "scroll" | "screenshot" | "screen_find" | "screen_click" (required)
-  text: string (for type)
-  x, y: int (for click)
-  keys: string (for hotkey, e.g. "ctrl+c")
-  key: string (for press)
-  direction: "up" | "down" (for scroll)
-  description: string (for screen_find/screen_click)
-
-screen_process
-  text: string (required) — what to analyze or ask about the screen
-  angle: "screen" | "camera" (optional)
-
-send_message
-  receiver: string (required)
-  message_text: string (required)
-  platform: string (required)
-
-reminder
-  date: string YYYY-MM-DD (required)
-  time: string HH:MM (required)
-  message: string (required)
-
-desktop_control
-  action: "wallpaper" | "organize" | "clean" | "list" | "task" (required)
-  path: string (optional)
-  task: string (optional)
-
-youtube_video
-  action: "play" | "summarize" | "trending" (required)
-  query: string (for play)
-
-weather_report
-  city: string (required)
-
-flight_finder
-  origin: string (required)
-  destination: string (required)
-  date: string (required)
-
-code_helper
-  action: "write" | "edit" | "run" | "explain" (required)
-  description: string (required)
-  language: string (optional)
-  output_path: string (optional)
-  file_path: string (optional)
-
-dev_agent
-  description: string (required)
-  language: string (optional)
-EXAMPLES:
-
-Goal: "research mechanical engineering and save it to a notepad file"
-Steps:
-
-web_search | query: "mechanical engineering overview definition history"
-web_search | query: "mechanical engineering applications and future trends"
-file_controller | action: write, path: desktop, name: mechanical_engineering.txt, content: "MECHANICAL ENGINEERING RESEARCH\n\nThis file will be filled with web research results."
-
-Goal: "What is the price of Bitcoin"
-Steps:
-
-web_search | query: "Bitcoin price today USD"
-
-Goal: "List the files on the desktop and find the largest 5 files"
-Steps:
-
-file_controller | action: list, path: desktop
-file_controller | action: largest, path: desktop, count: 5
-
-Goal: "Install PUBG from Steam"
-Steps:
-
-game_updater | action: install, platform: steam, game_name: "PUBG"
-
-Goal: "Update all my Steam games"
-Steps:
-
-game_updater | action: update, platform: steam
-
-Goal: "Send John a message on WhatsApp saying there is a meeting tomorrow"
-Steps:
-
-send_message | receiver: John, message_text: "There is a meeting tomorrow", platform: WhatsApp
-
-Goal: "Open the clock and set a reminder for 30 minutes later"
-Steps:
-
-reminder | date: [today], time: [now+30min], message: "Reminder"
-
-OUTPUT — return ONLY valid JSON, no markdown, no explanation, no code blocks:
+Return ONLY valid JSON:
 {
-  "goal": "...",
+  "goal": "description",
+  "can_parallelize": true,
   "steps": [
     {
       "step": 1,
       "tool": "tool_name",
-      "description": "what this step does",
+      "description": "what this does",
       "parameters": {},
+      "depends_on": [],
+      "parallel": false,
       "critical": true
     }
   ]
-}
-"""
+}"""
 
 
-def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+REPLAN_PROMPT = """You are replanning a failed JARVIS task. Create a REVISED strategy.
+
+Goal: {goal}
+Completed steps: {completed}
+Failed step: {failed_step}
+Error: {error}
+
+Generate a new plan for REMAINING work only. Do NOT repeat completed steps.
+Use a DIFFERENT approach for the failed step.
+Return ONLY valid JSON with the same schema."""
 
 
 def create_plan(goal: str, context: str = "") -> dict:
-    import google.generativeai as genai
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash-lite",
-        system_instruction=PLANNER_PROMPT
-    )
-
-    user_input = f"Goal: {goal}"
-    if context:
-        user_input += f"\n\nContext: {context}"
-
+    """Create an intelligent execution plan for a goal."""
     try:
-        response = model.generate_content(user_input)
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        gemini = _get_gemini()
 
+        user_input = f"Goal: {goal}"
+        if context:
+            user_input += f"\n\nAdditional context: {context}"
+
+        response = gemini.complete(
+            messages=[{"role": "user", "content": user_input}],
+            system=PLANNER_PROMPT
+        )
+
+        text = _strip_json(response)
         plan = json.loads(text)
 
         if "steps" not in plan or not isinstance(plan["steps"], list):
             raise ValueError("Invalid plan structure")
 
+        # Validate and clean steps
         for step in plan["steps"]:
-            if step.get("tool") in ("generated_code",):
-                print(f"[Planner] ⚠️ generated_code detected in step {step.get('step')} — replacing with web_search")
-                desc = step.get("description", goal)
-                step["tool"] = "web_search"
-                step["parameters"] = {"query": desc[:200]}
-
-        print(f"[Planner] ✅ Plan: {len(plan['steps'])} steps")
-        for s in plan["steps"]:
-            print(f"  Step {s['step']}: [{s['tool']}] {s['description']}")
-
-        return plan
-
-    except json.JSONDecodeError as e:
-        print(f"[Planner] ⚠️ JSON parse failed: {e}")
-        return _fallback_plan(goal)
-    except Exception as e:
-        print(f"[Planner] ⚠️ Planning failed: {e}")
-        return _fallback_plan(goal)
-
-
-def _fallback_plan(goal: str) -> dict:
-    print("[Planner] 🔄 Fallback plan")
-    return {
-        "goal": goal,
-        "steps": [
-            {
-                "step": 1,
-                "tool": "web_search",
-                "description": f"Search for: {goal}",
-                "parameters": {"query": goal},
-                "critical": True
-            }
-        ]
-    }
-
-
-def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
-    import google.generativeai as genai
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=PLANNER_PROMPT
-    )
-
-    completed_summary = "\n".join(
-        f"  - Step {s['step']} ({s['tool']}): DONE" for s in completed_steps
-    )
-
-    prompt = f"""Goal: {goal}
-
-Already completed:
-{completed_summary if completed_summary else '  (none)'}
-
-Failed step: [{failed_step.get('tool')}] {failed_step.get('description')}
-Error: {error}
-
-Create a REVISED plan for the remaining work only. Do not repeat completed steps."""
-
-    try:
-        response = model.generate_content(prompt)
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
-        plan     = json.loads(text)
-
-        for step in plan.get("steps", []):
+            step.setdefault("depends_on", [])
+            step.setdefault("parallel", False)
+            step.setdefault("critical", True)
+            # Safety: never use generated_code
             if step.get("tool") == "generated_code":
                 step["tool"] = "web_search"
                 step["parameters"] = {"query": step.get("description", goal)[:200]}
 
-        print(f"[Planner] 🔄 Revised plan: {len(plan['steps'])} steps")
+        print(f"[Planner] ✅ Plan: {len(plan['steps'])} steps (parallel={plan.get('can_parallelize', False)})")
+        for s in plan["steps"]:
+            par = " [PARALLEL]" if s.get("parallel") else ""
+            dep = f" [depends: {s['depends_on']}]" if s.get("depends_on") else ""
+            print(f"  Step {s['step']}: [{s['tool']}] {s['description']}{par}{dep}")
+
         return plan
-    except Exception as e:
-        print(f"[Planner] ⚠️ Replan failed: {e}")
+
+    except json.JSONDecodeError as e:
+        print(f"[Planner] JSON parse failed: {e} — using fallback")
         return _fallback_plan(goal)
+    except Exception as e:
+        print(f"[Planner] Planning failed: {e} — using fallback")
+        return _fallback_plan(goal)
+
+
+def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
+    """Replan after a failure — try a different approach."""
+    try:
+        gemini = _get_gemini()
+
+        completed_summary = "\n".join(
+            f"  - Step {s.get('step')}: [{s.get('tool')}] {s.get('description')} — DONE"
+            for s in completed_steps
+        ) or "  (none yet)"
+
+        prompt = REPLAN_PROMPT.format(
+            goal=goal,
+            completed=completed_summary,
+            failed_step=f"[{failed_step.get('tool')}] {failed_step.get('description')}",
+            error=error[:400]
+        )
+
+        response = gemini.complete(
+            messages=[{"role": "user", "content": prompt}],
+            system=PLANNER_PROMPT
+        )
+
+        text = _strip_json(response)
+        plan = json.loads(text)
+
+        for step in plan.get("steps", []):
+            step.setdefault("depends_on", [])
+            step.setdefault("parallel", False)
+            step.setdefault("critical", False)
+            if step.get("tool") == "generated_code":
+                step["tool"] = "web_search"
+                step["parameters"] = {"query": step.get("description", goal)[:200]}
+
+        print(f"[Planner] 🔄 Replan: {len(plan.get('steps', []))} steps")
+        return plan
+
+    except Exception as e:
+        print(f"[Planner] Replan failed: {e}")
+        return _fallback_plan(f"Alternative approach for: {goal}")
+
+
+def _strip_json(text: str) -> str:
+    """Strip markdown fences and extract JSON."""
+    text = text.strip()
+    text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+    # Find JSON object
+    start = text.find("{")
+    end   = text.rfind("}") + 1
+    if start != -1 and end > start:
+        return text[start:end]
+    return text
+
+
+def _fallback_plan(goal: str) -> dict:
+    """Safe fallback plan — single web search step."""
+    return {
+        "goal": goal,
+        "can_parallelize": False,
+        "steps": [{
+            "step": 1,
+            "tool": "web_search",
+            "description": f"Search for: {goal}",
+            "parameters": {"query": goal[:200]},
+            "depends_on": [],
+            "parallel": False,
+            "critical": True,
+        }]
+    }

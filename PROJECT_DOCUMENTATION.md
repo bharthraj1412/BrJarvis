@@ -34,7 +34,7 @@ Users can interact with the AI through two independent interfaces, bridged throu
 
 ## 2. The Skills & Tools Ecosystem
 
-JARVIS combines over 30 deterministic Python tools with a dynamic "Skill" ecosystem representing repeatable prompt templates.
+JARVIS combines 47 deterministic Python tools with a dynamic "Skill" ecosystem representing repeatable prompt templates.
 
 ### 2.1 Tool Registry
 - **`system_monitor.py`**: Cross-platform system telemetry. Gathers CPU, RAM, Disk, Network, and Top Processes. Dynamically falls back from `psutil` to OS-native queries (`powershell`, `df`, `free`, `uptime`).
@@ -75,7 +75,7 @@ JARVIS does not suffer from context-amnesia between application restarts.
 ## 5. Security & Scope Enforcement (Red Team)
 
 JARVIS MK37 is built for DevSecOps users and ensures strict control over system automation.
-- **Permission Modes (`permissions.py`)**: Global enforcement of `ALLOW_ALL`, `CONFIRM_ALL`, and explicit `DENY_LIST` patterns (via `JARVIS_DENY_TOOLS` env variables).
+- **Permission Modes (`permissions.py`)**: Global enforcement of `ALLOW_ALL`, `CONFIRM_ALL`, and `DENY_ALL`. Mode is controlled by `JARVIS_PERMISSION_MODE` (with fallback to `current_scope.json`), and explicit deny/allow lists are sourced from scope permissions.
 - **Persistent Audit Logging**: Every tool execution, payload, and authorization decision is securely logged to `~/.jarvis/audit.log` for forensic rollback.
 - **Scope Definitions (`current_scope.json`)**: An explicit JSON schema dictating allowed/excluded IPv4 blocks, target domains, temporal engagement hours, and acceptable actions. Tools explicitly cross-reference the ScopeEnforcer prior to execution.
 

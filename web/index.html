@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JARVIS MK37 — Advanced AI-powered command console and neural interface with multi-backend routing.">
+    <title>JARVIS MK37 — Neural Command Interface</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦾</text></svg>">
+    <link rel="stylesheet" href="/web/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;600;700;800&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- CRT vignette overlays -->
+    <div class="hologram-overlay"></div>
+    <div class="scanlines"></div>
+
+    <div class="hud-container">
+        <!-- ── HEADER ── -->
+        <header class="hud-header">
+            <div class="logo-area">
+                <span class="logo-pulse">●</span>
+                <h1>JARVIS <span class="badge">COGNITIVE v37.2</span> <span class="badge native-badge" id="nativeBadge">C NATIVE ⚡</span></h1>
+            </div>
+            
+            <div class="header-metrics">
+                <div class="h-metric">
+                    <span class="lbl">LATENCY</span>
+                    <span class="val green" id="network-latency">—</span>
+                </div>
+                <div class="h-metric">
+                    <span class="lbl">ACTIVE CORE</span>
+                    <select id="backendSelector" class="backend-select" title="Select Active Core Backend">
+                        <option value="gemini">GEMINI</option>
+                        <option value="gpt">GPT</option>
+                        <option value="claude">CLAUDE</option>
+                        <option value="ollama">OLLAMA</option>
+                        <option value="nvidia">NVIDIA</option>
+                        <option value="mistral">MISTRAL</option>
+                    </select>
+                </div>
+                <div class="h-metric">
+                    <span class="lbl">SYSTEM</span>
+                    <span class="val green" id="conn-status">ONLINE</span>
+                </div>
+                <div class="system-time" id="system-time">00:00:00</div>
+            </div>
+        </header>
+
+        <!-- ── MAIN HUD GRID ── -->
+        <main class="hud-grid">
+            
+            <!-- LEFT PANEL: Status, Gauges & Memory Explorer -->
+            <section class="hud-panel left-panel">
+                <div class="panel-header">
+                    <span>◈ SYSTEM STATUS & METRICS</span>
+                    <span class="panel-sub" id="os-label">OS: WINDOWS</span>
+                </div>
+
+                <!-- Circular Radial Telemetry Gauges -->
+                <div class="radial-metrics">
+                    <div class="radial-card">
+                        <div class="radial-svg-container">
+                            <svg class="radial-ring" viewBox="0 0 100 100">
+                                <circle class="bg" cx="50" cy="50" r="40"></circle>
+                                <circle class="fill cpu" id="cpu-ring" cx="50" cy="50" r="40"></circle>
+                            </svg>
+                            <span class="radial-value" id="cpu-value">0%</span>
+                        </div>
+                        <span class="radial-lbl">CPU</span>
+                    </div>
+                    
+                    <div class="radial-card">
+                        <div class="radial-svg-container">
+                            <svg class="radial-ring" viewBox="0 0 100 100">
+                                <circle class="bg" cx="50" cy="50" r="40"></circle>
+                                <circle class="fill ram" id="ram-ring" cx="50" cy="50" r="40"></circle>
+                            </svg>
+                            <span class="radial-value" id="ram-value">0%</span>
+                        </div>
+                        <span class="radial-lbl">RAM</span>
+                    </div>
+
+                    <div class="radial-card">
+                        <div class="radial-svg-container">
+                            <svg class="radial-ring" viewBox="0 0 100 100">
+                                <circle class="bg" cx="50" cy="50" r="40"></circle>
+                                <circle class="fill disk" id="disk-ring" cx="50" cy="50" r="40"></circle>
+                            </svg>
+                            <span class="radial-value" id="disk-value">0%</span>
+                        </div>
+                        <span class="radial-lbl">DISK</span>
+                    </div>
+                </div>
+
+                <!-- Tabs for Memory & Skills -->
+                <div class="tab-container">
+                    <div class="tab-headers">
+                        <button class="tab-btn active" data-tab="memoryTab">MEMORIES</button>
+                        <button class="tab-btn" data-tab="skillsTab">SKILLS</button>
+                    </div>
+                    
+                    <!-- Memories Tab -->
+                    <div class="tab-content active" id="memoryTab">
+                        <div class="memory-header">
+                            <input type="text" id="memorySearchInput" placeholder="Filter memories...">
+                            <button class="add-memory-btn" id="openAddMemoryModalBtn" title="Create Memory">+</button>
+                        </div>
+                        <div class="memory-list" id="memoryListContainer">
+                            <div class="loading-placeholder">Reading memory cells...</div>
+                        </div>
+                    </div>
+
+                    <!-- Skills Tab -->
+                    <div class="tab-content" id="skillsTab">
+                        <div class="skills-list" id="skillsListContainer">
+                            <div class="loading-placeholder">Loading skill templates...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- MIDDLE PANEL: Neural Chat Interface (Streaming) -->
+            <section class="hud-panel center-panel">
+                <div class="panel-header">
+                    <span>◈ COGNITIVE DIALOGUE MODULE</span>
+                    <span class="panel-sub" id="chat-mode-label">MODE: GENERAL</span>
+                </div>
+                
+                <div class="chat-container" id="chatWindow">
+                    <div class="chat-bubble system">
+                        <div class="sender">JARVIS</div>
+                        <div class="msg-text">Systems online, sir. Neural link initialized. Standing by for directives.</div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <input type="text" id="chatInput" placeholder="Enter command or natural language directive..." autocomplete="off">
+                    <button class="send-btn" id="sendChatBtn" title="Transmit Directives">TRANSMIT</button>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: Live Logs & Telemetry -->
+            <section class="hud-panel right-panel">
+                <div class="panel-header">
+                    <span>◈ CORE TERMINAL LOGS</span>
+                    <button class="clear-btn" id="clearConsoleBtn" title="Flush Console Log">FLUSH</button>
+                </div>
+                <div class="console-output" id="consoleLog">
+                    <div class="log-entry sys">[SYSTEM] Server connection handshake initialized.</div>
+                </div>
+            </section>
+
+            <!-- BOTTOM PANEL: Task Management -->
+            <section class="hud-panel bottom-panel">
+                <div class="panel-header">
+                    <span>◈ PARALLEL GOAL MONITOR</span>
+                    <span class="panel-sub">MAX WORKERS: 3</span>
+                </div>
+                <div class="tasks-container" id="tasksList">
+                    <div class="no-tasks">All concurrent worker pipes are currently idle.</div>
+                </div>
+            </section>
+            
+        </main>
+    </div>
+
+    <!-- ── CREATE MEMORY MODAL ── -->
+    <div class="modal" id="addMemoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>SAVE MEMORY ENTRY</h3>
+                <button class="close-modal-btn" id="closeMemoryModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="memName">Name / Title</label>
+                    <input type="text" id="memName" placeholder="e.g. server_details">
+                </div>
+                <div class="form-group">
+                    <label for="memType">Type</label>
+                    <select id="memType">
+                        <option value="user">User preference</option>
+                        <option value="project">Project reference</option>
+                        <option value="feedback">Feedback</option>
+                        <option value="reference">General reference</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="memDesc">Short Description</label>
+                    <input type="text" id="memDesc" placeholder="e.g. Local DB ports and keys">
+                </div>
+                <div class="form-group">
+                    <label for="memContent">Memory Content</label>
+                    <textarea id="memContent" rows="6" placeholder="Write memory cell content here..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="memScope">Scope</label>
+                    <select id="memScope">
+                        <option value="user">User (Global)</option>
+                        <option value="project">Project (Local CWD)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelMemoryModalBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveMemoryBtn">SAVE ENTRY</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/web/app.js"></script>
+</body>
+</html>

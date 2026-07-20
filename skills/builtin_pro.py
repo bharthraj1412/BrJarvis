@@ -742,6 +742,146 @@ $ARGUMENTS
 """
 
 
+_KUBERNETES_GEN = """\
+You are a Kubernetes deployment architect. Generate K8s manifests.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Understand service requirements (replicas, ports, env vars, ingress, PVC).
+2. Generate Kubernetes YAML manifests:
+   - Deployment / StatefulSet
+   - Service (ClusterIP / NodePort / LoadBalancer)
+   - Ingress / HTTPRoute
+   - ConfigMap & Secret templates
+3. Add resource limits (CPU/RAM requests & limits) and readiness/liveness probes.
+4. Write files with file_write.
+"""
+
+_PERFORMANCE_PROFILE = """\
+You are a performance profiling expert. Benchmark and optimize slow execution.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Read the target code file with file_read.
+2. Run cProfile or execution timing with run_code:
+   ```python
+   import cProfile, pstats
+   profiler = cProfile.Profile()
+   profiler.runcall(target_function)
+   stats = pstats.Stats(profiler).sort_stats('cumtime')
+   stats.print_stats(15)
+   ```
+3. Pinpoint bottleneck functions and memory hot-spots.
+4. Provide concrete code optimizations.
+"""
+
+_DATABASE_MIGRATION = """\
+You are a database migration specialist. Generate migration scripts.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Compare old and new database schemas or models.
+2. Generate migration code (SQL statements or Alembic/Prisma/Knex scripts).
+3. Ensure backwards compatibility and non-locking execution for production.
+4. Write migration file with file_write.
+"""
+
+_LINUX_HARDENING = """\
+You are a Linux system security hardening specialist.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Check SSH configuration (`/etc/ssh/sshd_config`), root access, password auth.
+2. Inspect firewall status (`ufw status` / `iptables -L`).
+3. Audit open ports, fail2ban rules, and permissions of `/etc/shadow` and `/etc/passwd`.
+4. Provide a hardened security setup shell script.
+"""
+
+_WEB_SCRAPER_PRO = """\
+You are a web scraping specialist. Build reliable web extractors.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Fetch target HTML using fetch_page or fetch_raw.
+2. Parse HTML structure using BeautifulSoup or PyQuery.
+3. Handle pagination, user-agent headers, rate limiting, and output JSON/CSV format.
+4. Save clean data with file_write.
+"""
+
+_ASYNC_CONVERSION = """\
+You are an async Python refactoring expert. Convert sync code to asyncio.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Read synchronous python file with file_read.
+2. Replace blocking network/file calls with `asyncio`, `httpx`, or `aiofiles`.
+3. Add `async def` and `await` markers cleanly.
+4. Ensure no unawaited coroutines or blocking loops remain.
+"""
+
+_GRAPHQL_DESIGN = """\
+You are a GraphQL schema architect. Generate GraphQL schemas and resolvers.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Define GraphQL types, interfaces, queries, and mutations.
+2. Create Schema Definition Language (SDL) file.
+3. Write python/JS resolver functions for data fetching.
+4. Write schema file with file_write.
+"""
+
+_LOG_AGGREGATE = """\
+You are a log aggregation specialist. Analyze distributed service logs.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Read log files across services with file_read or run_code.
+2. Parse timestamped log entries and aggregate error codes (5xx, timeouts, exceptions).
+3. Produce a root-cause summary and incident timeline.
+"""
+
+_CLOUD_ARCH = """\
+You are a Cloud Solution Architect. Design multi-cloud infrastructure solutions.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Map application needs to AWS, GCP, or Azure cloud services.
+2. Formulate architectural diagram and component specification.
+3. Include high availability, multi-region failover, cost estimations, and security boundaries.
+"""
+
+_MALWARE_TRIAGE = """\
+You are a malware triage analyst. Conduct safe static binary analysis.
+
+## Task
+$ARGUMENTS
+
+## Steps
+1. Compute MD5, SHA1, SHA256 hashes of the sample.
+2. Extract printable ASCII/Unicode strings from binary with `strings` or python.
+3. Inspect PE/ELF header sections, imported libraries, and network indicators.
+4. Formulate risk report.
+"""
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  REGISTRATION
 # ═══════════════════════════════════════════════════════════════════════════
@@ -772,6 +912,10 @@ _PRO_SKILLS = [
      ["run_code", "fetch_raw"], _SSL_CHECK, "checking SSL certificates"),
     ("hash_lookup", "File hash calculation and lookup", ["/hash", "/hash-lookup"],
      ["run_code", "web_search", "file_read"], _HASH_LOOKUP, "analyzing file hashes"),
+    ("linux_hardening", "Linux OS security hardening and SSH firewall audit", ["/hardening", "/sys-secure"],
+     ["run_code", "file_read"], _LINUX_HARDENING, "hardening Linux OS"),
+    ("malware_triage", "Safe static binary triage and string analysis", ["/malware-triage", "/binary-scan"],
+     ["run_code", "file_read"], _MALWARE_TRIAGE, "triage of binary samples"),
 
     # Data
     ("csv_analysis", "Analyze CSV/JSON data files", ["/csv-analysis", "/data-analysis", "/analyze-data"],
@@ -784,6 +928,10 @@ _PRO_SKILLS = [
      ["run_code", "file_read"], _DB_QUERY, "writing SQL queries"),
     ("chart_gen", "Generate charts from data", ["/chart", "/chart-gen", "/plot"],
      ["run_code", "file_read", "file_write"], _CHART_GEN, "generating charts"),
+    ("web_scraper_pro", "Extract data using HTML parsing and headless browser", ["/scrape", "/web-extract"],
+     ["web_search", "fetch_page", "file_write"], _WEB_SCRAPER_PRO, "scraping websites"),
+    ("database_migration", "Design database schema migration scripts", ["/db-migrate", "/migration"],
+     ["file_write", "file_read"], _DATABASE_MIGRATION, "database migrations"),
 
     # DevOps
     ("docker_compose", "Create Docker Compose configurations", ["/docker-compose", "/compose"],
@@ -796,6 +944,20 @@ _PRO_SKILLS = [
      ["file_write", "file_read", "run_code"], _ENV_SETUP, "setting up dev environments"),
     ("terraform_gen", "Generate Terraform IaC configs", ["/terraform", "/tf"],
      ["file_write", "file_read"], _TERRAFORM_GEN, "generating Terraform configs"),
+    ("kubernetes_gen", "Generate Kubernetes manifests and deployments", ["/k8s", "/kubectl"],
+     ["file_write", "file_read"], _KUBERNETES_GEN, "creating Kubernetes manifests"),
+
+    # Advanced Engineering
+    ("performance_profile", "Profile CPU and memory performance bottlenecks", ["/profile", "/perf"],
+     ["run_code", "file_read"], _PERFORMANCE_PROFILE, "performance profiling"),
+    ("async_conversion", "Refactor synchronous code to async/await", ["/async-convert", "/asyncio"],
+     ["file_read", "file_write"], _ASYNC_CONVERSION, "async code conversion"),
+    ("graphql_design", "Design GraphQL schemas and resolvers", ["/graphql", "/schema"],
+     ["file_write", "file_read"], _GRAPHQL_DESIGN, "GraphQL schema design"),
+    ("log_aggregate", "Aggregate and analyze distributed service logs", ["/log-aggregate", "/log-parse"],
+     ["file_read", "run_code"], _LOG_AGGREGATE, "log aggregation"),
+    ("cloud_architecture", "Design cloud infrastructure solution architectures", ["/cloud-arch", "/cloud-design"],
+     ["file_write"], _CLOUD_ARCH, "cloud architecture design"),
 
     # Productivity
     ("doc_gen", "Generate technical documentation", ["/doc-gen", "/docs", "/generate-docs"],
@@ -822,7 +984,7 @@ _PRO_SKILLS = [
 
 
 def _register_pro_skills() -> None:
-    """Register all 30 professional skills."""
+    """Register all professional skills."""
     for name, desc, triggers, tools, prompt, when in _PRO_SKILLS:
         register_builtin_skill(SkillDef(
             name=name,
@@ -841,3 +1003,4 @@ def _register_pro_skills() -> None:
 
 
 _register_pro_skills()
+

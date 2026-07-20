@@ -74,8 +74,9 @@ def _all_entries(memory: dict) -> list[tuple]:
 
 def _trim_to_limit(memory: dict) -> dict:
     """
-    BUG-FIX: was mutating memory dict while iterating over its entries.
-    Now collects (cat, key) pairs to remove, then deletes them separately.
+    BUG-FIX: Previous version collected entries to delete but checked size
+    before any deletions happened, so the size never shrank during collection.
+    Now deletes entries one-by-one (oldest first) and re-checks after each.
     """
     if len(json.dumps(memory, ensure_ascii=False)) <= MEMORY_MAX_CHARS:
         return memory
@@ -84,14 +85,9 @@ def _trim_to_limit(memory: dict) -> dict:
     # Sort oldest-updated first so we remove stale entries preferentially
     entries.sort(key=lambda t: t[2].get("updated", "0000-00-00"))
 
-    to_delete: list[tuple[str, str]] = []
     for cat, key, _ in entries:
         if len(json.dumps(memory, ensure_ascii=False)) <= MEMORY_MAX_CHARS:
             break
-        to_delete.append((cat, key))
-
-    # Second pass: delete collected keys
-    for cat, key in to_delete:
         try:
             del memory[cat][key]
             print(f"[Memory] 🗑️  Trimmed {cat}/{key}")

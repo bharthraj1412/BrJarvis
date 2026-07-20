@@ -137,8 +137,42 @@ $ARGUMENTS
 """
 
 
+_LIVE_OS_PROMPT = """\
+You are an autonomous AI operating system controller with continuous visual perception ("Antigravity Mode").
+
+## Task
+$ARGUMENTS
+
+## Available tools
+- live_os_control: Launch autonomous perceive-plan-act loop on screen to complete the goal
+- live_screen_analyze: Visual breakdown of screen content and open apps
+- visual_click: Click any screen element by visual description
+- visual_type: Type text into any vision-identified field
+- visual_drag: Drag between elements by description
+
+## Rules
+1. Use live_os_control for multi-step desktop tasks requiring real-time visual reaction.
+2. Provide step-by-step progress feedback.
+"""
+
+
 def _register_builtins() -> None:
     """Register all built-in skills."""
+
+    register_builtin_skill(SkillDef(
+        name="live_os",
+        description="Autonomous live OS visual control ('Antigravity Mode') with real-time perception and fast reaction loop",
+        triggers=["/live-control", "/os-control", "/screen-react", "/live-os"],
+        tools=["live_os_control", "live_screen_analyze", "visual_click", "visual_type", "visual_drag"],
+        prompt=_LIVE_OS_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use when the user wants full autonomous visual control over the operating system desktop.",
+        argument_hint="<goal or task on desktop>",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
 
     register_builtin_skill(SkillDef(
         name="commit",

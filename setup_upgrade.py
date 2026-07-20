@@ -86,7 +86,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 # OLLAMA_HOST=http://localhost:11434
 
 # ── MODEL OVERRIDES (optional) ─────────────────────────────
-# JARVIS_MODEL_GEMINI=gemini-2.5-flash
+# JARVIS_MODEL_GEMINI=gemini-3.5-flash
 # JARVIS_DEFAULT_BACKEND=gemini
 """
 

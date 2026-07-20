@@ -1,0 +1,104 @@
+# backends/anthropic.py — JARVIS MK37 Anthropic (Claude) Backend
+"""
+Anthropic (Claude) backend connector for BR Core.
+Safe initialization, standardized error handling, and text streaming.
+"""
+from __future__ import annotations
+
+import os
+import traceback
+from typing import Generator
+
+from backends.base import BaseBackend
+
+
+class ClaudeBackend(BaseBackend):
+    """Anthropic Claude backend with proper message format conversion."""
+
+    def __init__(self, model: str = None, api_key: str = None):
+        try:
+            from config.models import get_model
+            default_model = get_model("claude") or "claude-sonnet-4-20250514"
+        except Exception:
+            default_model = "claude-sonnet-4-20250514"
+
+        self.model = model or default_model
+        self.client = None
+
+        _api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        if _api_key:
+            try:
+                import anthropic
+                self.client = anthropic.Anthropic(api_key=_api_key)
+                print(f"[Claude] [OK] Using model: {self.model}")
+            except ImportError:
+                print("[Claude] Warning: anthropic package is not installed.")
+
+    @property
+    def name(self) -> str:
+        return "Claude"
+
+    @property
+    def model_name(self) -> str:
+        return self.model
+
+    def _ensure_client(self):
+        if not self.client:
+            raise ValueError(
+                "Anthropic client is not initialized. "
+                "Ensure ANTHROPIC_API_KEY is configured in your environment or .env, "
+                "and the 'anthropic' pip package is installed."
+            )
+
+    def _format_messages(self, messages: list, system: str = "") -> tuple[list, str]:
+        """Convert standard messages to Anthropic format (system is separate)."""
+        formatted = []
+        sys_prompt = system
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role == "system":
+                if not sys_prompt:
+                    sys_prompt = content
+                continue
+            formatted.append({"role": role, "content": content})
+        return formatted, sys_prompt
+
+    def complete(self, messages: list, system: str = "", tools: list = None) -> str:
+        try:
+            self._ensure_client()
+            formatted, sys_prompt = self._format_messages(messages, system)
+
+            kwargs = {
+                "model": self.model,
+                "max_tokens": 8192,
+                "messages": formatted,
+            }
+            if sys_prompt:
+                kwargs["system"] = sys_prompt
+
+            response = self.client.messages.create(**kwargs)
+            return response.content[0].text
+        except Exception as e:
+            print(f"[Claude] Error: {e}")
+            traceback.print_exc()
+            raise
+
+    def stream(self, messages: list, system: str = "") -> Generator[str, None, None]:
+        try:
+            self._ensure_client()
+            formatted, sys_prompt = self._format_messages(messages, system)
+
+            kwargs = {
+                "model": self.model,
+                "max_tokens": 8192,
+                "messages": formatted,
+            }
+            if sys_prompt:
+                kwargs["system"] = sys_prompt
+
+            with self.client.messages.stream(**kwargs) as stream_res:
+                for text in stream_res.text_stream:
+                    yield text
+        except Exception as e:
+            yield f"\n[Claude Stream Error: {e}]"

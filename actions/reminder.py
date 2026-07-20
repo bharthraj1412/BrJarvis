@@ -1,4 +1,5 @@
 import json
+import platform
 import shutil
 import subprocess
 import sys
@@ -16,9 +17,9 @@ def _get_os() -> str:
         cfg = json.loads(
             (_base_dir() / "config" / "api_keys.json").read_text(encoding="utf-8")
         )
-        return cfg.get("os_system", "windows").lower()
+        return cfg.get("os_system", platform.system().lower()).lower()
     except Exception:
-        return "windows"
+        return platform.system().lower()
 
 
 def _scripts_dir() -> Path:

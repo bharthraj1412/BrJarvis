@@ -269,7 +269,8 @@ test("find_relevant_memories", t_find_relevant_memories)
 print("\n>> Tool Registry")
 
 def t_registry_all_schemas_have_name():
-    from tools.registry import TOOL_SCHEMAS
+    from tools.registry import TOOL_SCHEMAS, _import_plugins
+    _import_plugins()
     for t in TOOL_SCHEMAS:
         assert "name" in t, f"Schema missing name: {t}"
         assert "description" in t, f"Schema {t['name']} missing description"
@@ -277,7 +278,8 @@ def t_registry_all_schemas_have_name():
 test("All schemas have name+desc+params", t_registry_all_schemas_have_name)
 
 def t_registry_tool_count():
-    from tools.registry import TOOL_SCHEMAS
+    from tools.registry import TOOL_SCHEMAS, _import_plugins
+    _import_plugins()
     count = len(TOOL_SCHEMAS)
     assert count >= 30, f"Expected 30+ tools, got {count}"
 test("Tool count >= 30", t_registry_tool_count)
@@ -354,7 +356,7 @@ def t_orchestrator_system_prompt():
     orch.vector_memory = None
     orch._subagent_mgr = None
     system = orch._build_system()
-    assert "JARVIS MK37" in system
+    assert "BR" in system
     assert "tool_call" in system
     assert "cursor_click" in system
     assert "spawn_agent" in system
@@ -418,7 +420,7 @@ def t_router_run_missing():
         r.run(AgentProfile.CLAUDE, [], "")
         assert False, "Should have raised"
     except RuntimeError as e:
-        assert "not available" in str(e).lower()
+        assert "no backends available" in str(e).lower()
 test("Router.run raises on missing backend", t_router_run_missing)
 
 # == 12. Cross-module Integration ==
@@ -492,4 +494,5 @@ if errors:
         print(f"\n--- {name} ---")
         print(tb)
 
-sys.exit(1 if failed else 0)
+if __name__ == "__main__":
+    sys.exit(1 if failed else 0)

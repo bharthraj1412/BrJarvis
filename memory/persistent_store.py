@@ -107,28 +107,126 @@ def _format_entry_md(entry: MemoryEntry) -> str:
 
 # ── Core storage operations ────────────────────────────────────────────────
 
+def _backup_version(file_path: Path):
+    """Save a historical version of the file before overwrite."""
+    try:
+        if not file_path.exists():
+            return
+        history_dir = file_path.parent / ".history"
+        history_dir.mkdir(exist_ok=True)
+        mtime = file_path.stat().st_mtime
+        from datetime import datetime as dt
+        timestamp = dt.fromtimestamp(mtime).strftime("%Y%m%d_%H%M%S")
+        history_file = history_dir / f"{file_path.stem}_{timestamp}.md"
+        history_file.write_text(file_path.read_text(encoding="utf-8"), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _get_sqlite_conn(scope: str = "user"):
+    import sqlite3
+    db_dir = get_memory_dir(scope)
+    db_dir.mkdir(parents=True, exist_ok=True)
+    db_path = db_dir / "memory.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS memories (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE,
+            description TEXT,
+            type TEXT,
+            content TEXT,
+            created TEXT,
+            scope TEXT,
+            confidence REAL,
+            source TEXT,
+            last_used_at TEXT,
+            conflict_group TEXT,
+            file_path TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS memory_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            timestamp TEXT,
+            content TEXT,
+            description TEXT
+        )
+    """)
+    conn.commit()
+    return conn
+
+
+# ── Core storage operations ────────────────────────────────────────────────
+
 def save_memory(entry: MemoryEntry, scope: str = "user") -> None:
-    """Write/update a memory file and rebuild the index for that scope."""
+    """Write/update a memory file, backup previous version, sync to SQLite/Vector, and rebuild index."""
     mem_dir = get_memory_dir(scope)
     mem_dir.mkdir(parents=True, exist_ok=True)
     slug = _slugify(entry.name)
     fp = mem_dir / f"{slug}.md"
+    
+    # Versioning: backup existing markdown file
+    _backup_version(fp)
+    
     fp.write_text(_format_entry_md(entry), encoding="utf-8")
     entry.file_path = str(fp)
     entry.scope = scope
     _rewrite_index(scope)
     _sync_to_vector(entry)
 
+    # Sync to SQLite
+    try:
+        conn = _get_sqlite_conn(scope)
+        # Check if exists to store in versions
+        cursor = conn.cursor()
+        cursor.execute("SELECT content, description FROM memories WHERE name = ?", (entry.name,))
+        row = cursor.fetchone()
+        if row:
+            from datetime import datetime as dt
+            conn.execute(
+                "INSERT INTO memory_versions (name, timestamp, content, description) VALUES (?, ?, ?, ?)",
+                (entry.name, dt.now().isoformat(), row[0], row[1])
+            )
+        
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO memories 
+            (id, name, description, type, content, created, scope, confidence, source, last_used_at, conflict_group, file_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                slug, entry.name, entry.description, entry.type, entry.content,
+                entry.created, scope, entry.confidence, entry.source,
+                entry.last_used_at, entry.conflict_group, entry.file_path
+            )
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[Memory] SQLite sync warning: {e}")
+
 
 def delete_memory(name: str, scope: str = "user") -> None:
-    """Remove the memory file matching name and rebuild the index."""
+    """Remove the memory file matching name, delete from SQLite/Vector, and rebuild the index."""
     mem_dir = get_memory_dir(scope)
     slug = _slugify(name)
     fp = mem_dir / f"{slug}.md"
     if fp.exists():
+        _backup_version(fp)
         fp.unlink()
     _rewrite_index(scope)
     _remove_from_vector(name)
+
+    # Delete from SQLite
+    try:
+        conn = _get_sqlite_conn(scope)
+        conn.execute("DELETE FROM memories WHERE name = ?", (name,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[Memory] SQLite delete warning: {e}")
 
 
 def load_entries(scope: str = "user") -> list[MemoryEntry]:
@@ -200,7 +298,7 @@ _chroma_collection = None
 _chroma_available = False
 
 try:
-    import chromadb
+    import chromadb  # type: ignore
     _chroma_available = True
 except ImportError:
     pass
@@ -275,10 +373,19 @@ def _vector_search(query: str, all_entries: list[MemoryEntry], top_k: int = 10) 
         results = coll.query(query_texts=[query], n_results=min(top_k, count))
         if not results or not results["ids"] or not results["ids"][0]:
             return []
-        # Map vector results back to MemoryEntry objects
-        matched_slugs = set(results["ids"][0])
+        # Map vector results back to MemoryEntry objects and filter by distance threshold
         entry_map = {_slugify(e.name): e for e in all_entries}
-        return [entry_map[slug] for slug in results["ids"][0] if slug in entry_map]
+        matched = []
+        if "distances" in results and results["distances"] and results["distances"][0]:
+            for slug, dist in zip(results["ids"][0], results["distances"][0]):
+                if dist <= 0.60:
+                    if slug in entry_map:
+                        matched.append(entry_map[slug])
+        else:
+            for slug in results["ids"][0]:
+                if slug in entry_map:
+                    matched.append(entry_map[slug])
+        return matched
     except Exception:
         return []
 

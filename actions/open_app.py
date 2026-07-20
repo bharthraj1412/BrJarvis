@@ -1,79 +1,133 @@
-import time
-import subprocess
+# actions/open_app.py
+"""
+BR Voice Assistant — Application Launcher.
+Cross-platform implementation for Linux, macOS, and Windows.
+"""
+from __future__ import annotations
+
+import os
 import platform
 import shutil
+import subprocess
+import time
 
+_OS = platform.system()
 
-_SYSTEM = platform.system()
-
-_APP_ALIASES: dict[str, dict[str, str]] = {
-
-    "chrome":             {"Windows": "chrome",                  "Darwin": "Google Chrome",        "Linux": "google-chrome"},
-    "google chrome":      {"Windows": "chrome",                  "Darwin": "Google Chrome",        "Linux": "google-chrome"},
-    "firefox":            {"Windows": "firefox",                 "Darwin": "Firefox",              "Linux": "firefox"},
-    "edge":               {"Windows": "msedge",                  "Darwin": "Microsoft Edge",       "Linux": "microsoft-edge"},
-    "brave":              {"Windows": "brave",                   "Darwin": "Brave Browser",        "Linux": "brave-browser"},
-    "safari":             {"Windows": "msedge",                  "Darwin": "Safari",               "Linux": "firefox"},
-    "opera":              {"Windows": "opera",                   "Darwin": "Opera",                "Linux": "opera"},
-    "whatsapp":           {"Windows": "WhatsApp",                "Darwin": "WhatsApp",             "Linux": "whatsapp"},
-    "telegram":           {"Windows": "Telegram",                "Darwin": "Telegram",             "Linux": "telegram"},
-    "discord":            {"Windows": "Discord",                 "Darwin": "Discord",              "Linux": "discord"},
-    "slack":              {"Windows": "Slack",                   "Darwin": "Slack",                "Linux": "slack"},
-    "zoom":               {"Windows": "Zoom",                    "Darwin": "zoom.us",              "Linux": "zoom"},
-    "teams":              {"Windows": "msteams",                 "Darwin": "Microsoft Teams",      "Linux": "teams"},
-    "skype":              {"Windows": "skype",                   "Darwin": "Skype",                "Linux": "skype"},
-    "signal":             {"Windows": "signal",                  "Darwin": "Signal",               "Linux": "signal"},
-    "spotify":            {"Windows": "Spotify",                 "Darwin": "Spotify",              "Linux": "spotify"},
-    "vlc":                {"Windows": "vlc",                     "Darwin": "VLC",                  "Linux": "vlc"},
-    "netflix":            {"Windows": "Netflix",                 "Darwin": "Netflix",              "Linux": "firefox"},
-    "vscode":             {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
-    "visual studio code": {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
-    "code":               {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
-    "terminal":           {"Windows": "wt",                      "Darwin": "Terminal",             "Linux": "gnome-terminal"},
-    "cmd":                {"Windows": "cmd.exe",                 "Darwin": "Terminal",             "Linux": "bash"},
-    "powershell":         {"Windows": "powershell.exe",          "Darwin": "Terminal",             "Linux": "bash"},
-    "postman":            {"Windows": "Postman",                 "Darwin": "Postman",              "Linux": "postman"},
-    "git":                {"Windows": "git-bash",                "Darwin": "Terminal",             "Linux": "bash"},
-    "figma":              {"Windows": "Figma",                   "Darwin": "Figma",                "Linux": "figma"},
-    "blender":            {"Windows": "blender",                 "Darwin": "Blender",              "Linux": "blender"},
-    "word":               {"Windows": "winword",                 "Darwin": "Microsoft Word",       "Linux": "libreoffice --writer"},
-    "excel":              {"Windows": "excel",                   "Darwin": "Microsoft Excel",      "Linux": "libreoffice --calc"},
-    "powerpoint":         {"Windows": "powerpnt",                "Darwin": "Microsoft PowerPoint", "Linux": "libreoffice --impress"},
-    "libreoffice":        {"Windows": "soffice",                 "Darwin": "LibreOffice",          "Linux": "libreoffice"},
-    "notepad":            {"Windows": "notepad.exe",             "Darwin": "TextEdit",             "Linux": "gedit"},
-    "textedit":           {"Windows": "notepad.exe",             "Darwin": "TextEdit",             "Linux": "gedit"},
-    "explorer":           {"Windows": "explorer.exe",            "Darwin": "Finder",               "Linux": "nautilus"},
-    "file explorer":      {"Windows": "explorer.exe",            "Darwin": "Finder",               "Linux": "nautilus"},
-    "finder":             {"Windows": "explorer.exe",            "Darwin": "Finder",               "Linux": "nautilus"},
-    "task manager":       {"Windows": "taskmgr.exe",             "Darwin": "Activity Monitor",     "Linux": "gnome-system-monitor"},
-    "settings":           {"Windows": "ms-settings:",            "Darwin": "System Preferences",   "Linux": "gnome-control-center"},
-    "calculator":         {"Windows": "calc.exe",                "Darwin": "Calculator",           "Linux": "gnome-calculator"},
-    "paint":              {"Windows": "mspaint.exe",             "Darwin": "Preview",              "Linux": "gimp"},
-    "instagram":          {"Windows": "Instagram",               "Darwin": "Instagram",            "Linux": "firefox"},
-    "tiktok":             {"Windows": "TikTok",                  "Darwin": "TikTok",               "Linux": "firefox"},
-    "notion":             {"Windows": "Notion",                  "Darwin": "Notion",               "Linux": "notion"},
-    "obsidian":           {"Windows": "Obsidian",                "Darwin": "Obsidian",             "Linux": "obsidian"},
-    "capcut":             {"Windows": "CapCut",                  "Darwin": "CapCut",               "Linux": "capcut"},
-    "steam":              {"Windows": "steam",                   "Darwin": "Steam",                "Linux": "steam"},
-    "epic":               {"Windows": "EpicGamesLauncher",       "Darwin": "Epic Games Launcher",  "Linux": "legendary"},
-    "epic games":         {"Windows": "EpicGamesLauncher",       "Darwin": "Epic Games Launcher",  "Linux": "legendary"},
+_APP_ALIASES: dict[str, str] = {
+    "chrome":             "google-chrome" if _OS == "Linux" else "chrome",
+    "google chrome":      "google-chrome" if _OS == "Linux" else "chrome",
+    "firefox":            "firefox",
+    "edge":               "microsoft-edge" if _OS == "Linux" else "msedge",
+    "brave":              "brave-browser" if _OS == "Linux" else "brave",
+    "safari":             "safari" if _OS == "Darwin" else "firefox",
+    "whatsapp":           "whatsapp",
+    "telegram":           "telegram-desktop" if _OS == "Linux" else "Telegram",
+    "discord":            "discord",
+    "slack":              "slack",
+    "zoom":               "zoom",
+    "teams":              "teams",
+    "spotify":            "spotify",
+    "vlc":                "vlc",
+    "vscode":             "code",
+    "visual studio code": "code",
+    "code":               "code",
+    "terminal":           "x-terminal-emulator" if _OS == "Linux" else ("Terminal" if _OS == "Darwin" else "wt"),
+    "cmd":                "bash" if _OS != "Windows" else "cmd.exe",
+    "powershell":         "pwsh" if _OS != "Windows" else "powershell.exe",
+    "notepad":            "gedit" if _OS == "Linux" else ("TextEdit" if _OS == "Darwin" else "notepad.exe"),
+    "textedit":           "gedit" if _OS == "Linux" else ("TextEdit" if _OS == "Darwin" else "notepad.exe"),
+    "explorer":           "nautilus" if _OS == "Linux" else ("Finder" if _OS == "Darwin" else "explorer.exe"),
+    "file explorer":      "nautilus" if _OS == "Linux" else ("Finder" if _OS == "Darwin" else "explorer.exe"),
+    "finder":             "nautilus" if _OS == "Linux" else ("Finder" if _OS == "Darwin" else "explorer.exe"),
+    "task manager":       "gnome-system-monitor" if _OS == "Linux" else ("Activity Monitor" if _OS == "Darwin" else "taskmgr.exe"),
+    "settings":           "gnome-control-center" if _OS == "Linux" else ("ms-settings:" if _OS == "Windows" else "System Settings"),
+    "calculator":         "gnome-calculator" if _OS == "Linux" else ("Calculator" if _OS == "Darwin" else "calc.exe"),
+    "paint":              "gimp" if _OS == "Linux" else ("mspaint.exe" if _OS == "Windows" else "Paint"),
 }
 
 
 def _normalize(raw: str) -> str:
     key = raw.lower().strip()
-
     if key in _APP_ALIASES:
-        return _APP_ALIASES[key].get(_SYSTEM, raw)
+        return _APP_ALIASES[key]
 
-    for alias_key, os_map in _APP_ALIASES.items():
+    for alias_key, val in _APP_ALIASES.items():
         if alias_key in key or key in alias_key:
-            return os_map.get(_SYSTEM, raw)
+            return val
+    return raw
 
-    return raw  
+
+def _launch_linux(app_name: str) -> bool:
+    # 1. Direct executable in PATH check
+    candidates = [
+        app_name,
+        app_name.lower(),
+        app_name.split(".")[0],
+    ]
+    
+    # Fallback alternatives for standard linux desktop components
+    if app_name in ("gedit", "notepad"):
+        candidates.extend(["kate", "mousepad", "xed", "pluma", "leafpad", "nano"])
+    elif app_name in ("nautilus", "explorer"):
+        candidates.extend(["dolphin", "thunar", "nemo", "pcmanfm"])
+    elif app_name in ("gnome-system-monitor", "taskmgr"):
+        candidates.extend(["htop", "ksysguard", "top"])
+    elif app_name in ("x-terminal-emulator", "wt"):
+        candidates.extend(["gnome-terminal", "alacritty", "konsole", "kitty", "xfce4-terminal", "xterm"])
+    elif app_name in ("gnome-calculator", "calc"):
+        candidates.extend(["kcalc", "galculator", "xcalc"])
+
+    for cand in candidates:
+        bin_path = shutil.which(cand)
+        if bin_path:
+            try:
+                subprocess.Popen(
+                    [bin_path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                time.sleep(1.0)
+                return True
+            except Exception as e:
+                print(f"[open_app] Launch failed for '{cand}': {e}")
+
+    # 2. Try gtk-launch
+    if shutil.which("gtk-launch"):
+        try:
+            res = subprocess.run(["gtk-launch", app_name], capture_output=True)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
+
+    # 3. Try xdg-open if path or URI
+    if shutil.which("xdg-open"):
+        try:
+            subprocess.Popen(
+                ["xdg-open", app_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            return True
+        except Exception:
+            pass
+
+    return False
+
+
+def _launch_mac(app_name: str) -> bool:
+    try:
+        subprocess.Popen(["open", "-a", app_name])
+        return True
+    except Exception as e:
+        print(f"[open_app] macOS launch failed: {e}")
+        return False
+
 
 def _launch_windows(app_name: str) -> bool:
-
+    # 1. System path check
     if shutil.which(app_name) or shutil.which(app_name.split(".")[0]):
         try:
             subprocess.Popen(
@@ -87,6 +141,7 @@ def _launch_windows(app_name: str) -> bool:
         except Exception as e:
             print(f"[open_app] subprocess failed: {e}")
 
+    # 2. URI association check
     if ":" in app_name:
         try:
             subprocess.Popen(f"start {app_name}", shell=True)
@@ -95,6 +150,7 @@ def _launch_windows(app_name: str) -> bool:
         except Exception:
             pass
 
+    # 3. GUI Start Menu Search Fallback
     try:
         import pyautogui
         pyautogui.PAUSE = 0.1
@@ -111,111 +167,6 @@ def _launch_windows(app_name: str) -> bool:
     return False
 
 
-def _launch_macos(app_name: str) -> bool:
-
-    try:
-        result = subprocess.run(
-            ["open", "-a", app_name],
-            capture_output=True, timeout=8
-        )
-        if result.returncode == 0:
-            time.sleep(1.0)
-            return True
-    except Exception:
-        pass
-
-    try:
-        result = subprocess.run(
-            ["open", "-a", f"{app_name}.app"],
-            capture_output=True, timeout=8
-        )
-        if result.returncode == 0:
-            time.sleep(1.0)
-            return True
-    except Exception:
-        pass
-
-    binary = shutil.which(app_name) or shutil.which(app_name.lower())
-    if binary:
-        try:
-            subprocess.Popen(
-                [binary],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            time.sleep(1.0)
-            return True
-        except Exception:
-            pass
-
-    try:
-        import pyautogui
-        pyautogui.hotkey("command", "space")
-        time.sleep(0.6)
-        pyautogui.write(app_name, interval=0.05)
-        time.sleep(0.8)
-        pyautogui.press("enter")
-        time.sleep(1.5)
-        return True
-    except Exception as e:
-        print(f"[open_app] Spotlight failed: {e}")
-
-    return False
-
-
-def _launch_linux(app_name: str) -> bool:
-
-    binary = (
-        shutil.which(app_name) or
-        shutil.which(app_name.lower()) or
-        shutil.which(app_name.lower().replace(" ", "-")) or
-        shutil.which(app_name.lower().replace(" ", "_"))
-    )
-    if binary:
-        try:
-            subprocess.Popen(
-                [binary],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            time.sleep(1.0)
-            return True
-        except Exception:
-            pass
-
-    try:
-        subprocess.run(
-            ["xdg-open", app_name],
-            capture_output=True, timeout=5
-        )
-        return True
-    except Exception:
-        pass
-
-    for desktop_name in [
-        app_name.lower(),
-        app_name.lower().replace(" ", "-"),
-        app_name.lower().replace(" ", ""),
-    ]:
-        try:
-            result = subprocess.run(
-                ["gtk-launch", desktop_name],
-                capture_output=True, timeout=5
-            )
-            if result.returncode == 0:
-                return True
-        except Exception:
-            pass
-
-    return False
-
-
-_OS_LAUNCHERS = {
-    "Windows": _launch_windows,
-    "Darwin":  _launch_macos,
-    "Linux":   _launch_linux,
-}
-
 def open_app(
     parameters=None,
     response=None,
@@ -227,26 +178,23 @@ def open_app(
     if not app_name:
         return "No application name provided."
 
-    launcher = _OS_LAUNCHERS.get(_SYSTEM)
-    if launcher is None:
-        return f"Unsupported operating system: {_SYSTEM}"
-
     normalized = _normalize(app_name)
-    print(f"[open_app] Launching: '{app_name}' → '{normalized}' ({_SYSTEM})")
+    print(f"[open_app] Launching: '{app_name}' → '{normalized}' ({_OS})")
 
     if player:
         player.write_log(f"[open_app] {app_name}")
 
     try:
-        if launcher(normalized):
-            return f"Opened {app_name}."
-        if normalized.lower() != app_name.lower():
-            if launcher(app_name):
+        if _OS == "Linux":
+            if _launch_linux(normalized) or _launch_linux(app_name):
                 return f"Opened {app_name}."
-        return (
-            f"Could not confirm that {app_name} launched. "
-            f"It may still be loading, or it might not be installed."
-        )
+        elif _OS == "Darwin":
+            if _launch_mac(normalized) or _launch_mac(app_name):
+                return f"Opened {app_name}."
+        else:
+            if _launch_windows(normalized) or _launch_windows(app_name):
+                return f"Opened {app_name}."
+
+        return f"Could not launch application: '{app_name}' on {_OS}."
     except Exception as e:
-        print(f"[open_app] Error: {e}")
-        return f"Failed to open {app_name}: {e}"
+        return f"Error launching app '{app_name}': {e}"

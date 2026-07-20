@@ -21,7 +21,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-_OS = platform.system()  # "Windows" | "Darwin" | "Linux"
+_OS = platform.system()
 
 
 def _is_windows() -> bool: return _OS == "Windows"
@@ -40,8 +40,18 @@ API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 
 
 def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+    import os
+    for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = os.environ.get(env, "").strip()
+        if val:
+            return val
+    try:
+        if API_CONFIG_PATH.exists():
+            data = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
+            return data.get("gemini_api_key", "")
+    except Exception:
+        pass
+    return ""
 
 
 _MONTH_MAP: dict[str, int] = {
@@ -79,7 +89,9 @@ def _parse_date(raw: str) -> str:
     try:
         import google.generativeai as genai
         genai.configure(api_key=_get_api_key())
-        model    = genai.GenerativeModel("gemini-2.5-flash-lite")
+        from config.models import get_model
+        model_name = get_model("fast_model") or "gemini-3.1-flash-lite"
+        model    = genai.GenerativeModel(model_name)
         response = model.generate_content(
             f"Today is {today.strftime('%Y-%m-%d')}. "
             f"Convert this date expression to YYYY-MM-DD: '{raw}'. "
@@ -161,8 +173,10 @@ def _parse_flights_with_gemini(
 ) -> list[dict]:
     import google.generativeai as genai
     genai.configure(api_key=_get_api_key())
+    from config.models import get_model
+    model_name = get_model("gemini") or "gemini-3.5-flash"
     model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
+        model_name=model_name,
         system_instruction=(
             "You are a flight data extraction expert. "
             "Extract flight information from raw webpage text. "

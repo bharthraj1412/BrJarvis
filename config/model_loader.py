@@ -11,14 +11,14 @@ _CONFIG_DIR = Path(__file__).resolve().parent
 _MODELS_FILE = _CONFIG_DIR / "models.json"
 
 DEFAULTS = {
-    "voice_live": "models/gemini-2.5-flash",
+    "voice_live": "models/gemini-3.1-flash-live-preview",
     "voice_name": "Charon",
     "claude": "claude-sonnet-4-20250514",
     "gpt": "gpt-4o",
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3.5-flash",
     "ollama": "llama3",
     "nvidia": "meta/llama-3.1-70b-instruct",
-    "default_backend": "claude",
+    "default_backend": "gemini",
 }
 
 

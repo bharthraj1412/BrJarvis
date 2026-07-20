@@ -26,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote_plus
 
-_OS = platform.system()  # "Windows" | "Darwin" | "Linux"
+_OS = platform.system()
 
 try:
     import requests
@@ -183,8 +183,10 @@ def _get_transcript(video_id: str) -> str | None:
 def _summarize_with_gemini(transcript: str, video_url: str) -> str:
     import google.generativeai as genai
     genai.configure(api_key=_get_api_key())
+    from config.models import get_model
+    model_name = get_model("gemini") or "gemini-3.5-flash"
     model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
+        model_name=model_name,
         system_instruction=(
             "You are JARVIS, an AI assistant. "
             "Summarize YouTube video transcripts clearly and concisely. "
