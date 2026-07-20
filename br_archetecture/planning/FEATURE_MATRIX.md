@@ -12,4 +12,5 @@
 | **Plugin Platform** | Priority 8 | ✅ Completed | 100% (1 test) | `plugins/plugin_manager.py` |
 | **Vision Engine** | Priority 9 | ✅ Completed | 100% (3 tests) | `vision/engine.py`, `vision/screen_analyst.py`, `vision/ocr_engine.py` |
 | **Computer Operator** | Priority 10 | ✅ Completed | 100% (1 test) | `computer/operator.py`, `computer/types.py` |
-| **Total Test Suite** | **Subsystems 1-10** | **100%** | **27/27 PASSED** | **`tests/`** |
+| **Integration Test Suite** | Phase 1 | ✅ Completed | 100% (18 tests) | `tests/integration/` (Scenarios 1–30) |
+| **Total Test Suite** | **Subsystems 1-10 + Phase 1** | **100%** | **45/45 PASSED** | **`tests/`** |

@@ -47,5 +47,23 @@ All major architectural updates, subsystem additions, and core refactorings are 
 - **Subsystem 8: Plugin Runtime Platform (`plugins/plugin_manager.py`)**
   - Implemented dynamic `PluginManager` supporting community plugin discovery (`plugin.json`), lifecycle hooks (`on_load`), capability tool registration, and crash isolation.
 
-- **Test Suite**:
-  - Implemented 23 unit tests across `tests/` passing 100% cleanly in 0.67s.
+- **Subsystem 9: Vision Engine (`vision/`)**
+  - Implemented `vision/types.py` Pydantic v2 data models.
+  - Implemented `vision/screen_analyst.py` high-speed frame capture with FNV-1a frame hashing.
+  - Implemented `vision/ocr_engine.py` OCR text extractor and UI element locator.
+  - Implemented `vision/engine.py` master coordinator.
+
+- **Subsystem 10: Computer Operator (`computer/`)**
+  - Implemented `computer/types.py` Pydantic v2 action schemas.
+  - Implemented `computer/operator.py` desktop automation controller with permissions checking and interlocks.
+
+- **Phase 1: Integration & Validation**
+  - Implemented `core/integration.py` integration bridge between legacy and new core subsystems.
+  - Implemented `core/retry.py` sync/async exponential backoff retry decorator.
+  - Implemented `core/timeouts.py` parameterized timeout configurations.
+  - Implemented `core/error_middleware.py` global exception tracking and emergency interlock system.
+  - Unified tool registration inside `tools/registry.py` with `ToolRuntimeEngine`.
+  - Removed 7 dead/legacy root files (`anthropic_backend.py`, `gemini_backend.py`, `mistral_backend.py`, `nvidia_backend.py`, `ollama_backend.py`, `openai_backend.py`, `scratch.py`).
+  - Implemented 30 integration test scenarios in `tests/integration/` (Vision, Operator, Files, Terminal, Git, Memory, Stability).
+  - Created `.github/workflows/ci.yml` multi-platform test pipeline matrix (Ubuntu/Windows/macOS × Python 3.10–3.12).
+  - Increased total test coverage to **45/45 tests passing 100% green**.

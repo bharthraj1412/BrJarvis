@@ -36,6 +36,19 @@ def register_tool(name: str, description: str, parameters: dict | None = None) -
         if not any(s["name"] == name for s in TOOL_SCHEMAS):
             TOOL_SCHEMAS.append(schema)
         TOOL_REGISTRY[name] = func
+
+        # Also register in the unified ToolRuntimeEngine
+        try:
+            from tools.tool_runtime import get_tool_runtime
+            get_tool_runtime().register_tool(
+                name=name,
+                description=description,
+                handler=func,
+                parameters=parameters
+            )
+        except Exception:
+            pass
+
         return func
     return decorator
 

@@ -21,9 +21,58 @@ This document outlines the multi-phase implementation roadmap for the BR JARVIS 
 
 ---
 
-## 🔵 Phase 2: Advanced Workflows & Desktop UI (UPCOMING)
+## 🟢 Phase 1.5: Integration & Validation (COMPLETED)
 
-- [ ] **Subsystem Priority 11: Workflow Engine (`workflow/`)**
-- [ ] **Subsystem Priority 12: Multilingual Voice System (`voice/`)**
-- [ ] **Subsystem Priority 13: Desktop UI Platform (`ui/`)**
-- [ ] **Subsystem Priority 14: Enterprise Deployment & SDK (`enterprise/`)**
+- [x] **Integration Bridge** (`core/integration.py`) — Legacy-to-new architecture wiring
+- [x] **Retry & Backoff Decorator** (`core/retry.py`) — Sync/async exponential backoff
+- [x] **Parameterized Timeouts** (`core/timeouts.py`) — Centralized timeout configuration
+- [x] **Global Error Middleware** (`core/error_middleware.py`) — Exception tracking & emergency interlocks
+- [x] **Unified Tool Registration** — `tools/registry.py` bridged to `ToolRuntimeEngine`
+- [x] **EventBus Telemetry** — `orchestrator.py` emits `task.react.start/completed/failed`
+- [x] **Token Budget Tracking** — `router.py` tracks input/output tokens per request
+- [x] **Dead Code Cleanup** — Removed 7 orphaned root-level files
+- [x] **30 Integration Test Scenarios** (`tests/integration/`) — Vision, operator, files, terminal, memory, stability
+- [x] **CI/CD Pipeline** (`.github/workflows/ci.yml`) — GitHub Actions matrix (Ubuntu/Windows/macOS × Python 3.10–3.12)
+- [x] **45/45 Tests Passing** — Full green across unit + integration suites
+
+---
+
+## 🔵 Phase 2: Reasoning Engine (NEXT)
+
+- [ ] **Chain-of-Thought Reasoning** (`reasoning/chain.py`)
+- [ ] **Hypothesis Generator** (`reasoning/hypothesis.py`)
+- [ ] **Evidence Evaluator** (`reasoning/evaluator.py`)
+- [ ] **Reasoning Coordinator** (`reasoning/engine.py`)
+
+---
+
+## 🟡 Phase 3: Workflow Engine
+
+- [ ] **Workflow DSL & Parser** (`workflow/dsl.py`)
+- [ ] **Workflow Execution Engine** (`workflow/engine.py`)
+- [ ] **Conditional Branching & Loops** (`workflow/control.py`)
+
+---
+
+## 🟠 Phase 4: Voice System Overhaul
+
+- [ ] **Streaming STT/TTS Pipeline** (`voice/streaming.py`)
+- [ ] **Wake Word Engine** (`voice/wake.py`)
+- [ ] **Multilingual Voice Router** (`voice/multilingual.py`)
+
+---
+
+## 🔴 Phase 5: Desktop UI Platform
+
+- [ ] **Web-based Dashboard** (`ui/dashboard/`)
+- [ ] **Real-time System Monitors** (`ui/monitors/`)
+- [ ] **Plugin Marketplace UI** (`ui/marketplace/`)
+
+---
+
+## ⚫ Phase 6: Enterprise & SDK
+
+- [ ] **Plugin SDK** (`sdk/`)
+- [ ] **REST API Gateway** (`enterprise/gateway.py`)
+- [ ] **Multi-tenant Deployment** (`enterprise/tenants.py`)
+

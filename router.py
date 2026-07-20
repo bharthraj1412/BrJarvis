@@ -153,6 +153,7 @@ class AgentRouter:
         self.backends = backends
         self._health_cache: dict[AgentProfile, tuple[bool, float]] = {}
         self._health_ttl = 60.0  # Cache health checks for 60s
+        self.tokens_consumed = {"input": 0, "output": 0, "total": 0}
 
         configured = _get_configured_default()
         if configured in backends:
@@ -187,20 +188,54 @@ class AgentRouter:
                     return candidate
         return self.default
 
+    def get_token_usage_stats(self) -> dict[str, int]:
+        """Get the cumulative token statistics for all routing actions."""
+        return self.tokens_consumed
+
     def run(self, profile: AgentProfile, messages: list, system: str = "") -> str:
         """Execute a completion on the given backend, with automatic fallback."""
         if profile not in self.backends:
             profile = self._find_fallback(profile)
 
+        from context.token_counter import TokenCounter
+        from events.bus import get_event_bus
+        from events.types import BaseEvent
+
+        input_tokens = TokenCounter.count(system) + TokenCounter.count(str(messages))
+        self.tokens_consumed["input"] += input_tokens
+        self.tokens_consumed["total"] += input_tokens
+
         backend = self.backends[profile]
+        
+        # Publish routing decision event
         try:
-            return backend.complete(messages, system)
+            get_event_bus().publish(BaseEvent(
+                topic="model.route.selected",
+                payload={
+                    "backend": profile.value,
+                    "model_name": backend.model_name,
+                    "estimated_input_tokens": input_tokens
+                }
+            ))
+        except Exception:
+            pass
+
+        try:
+            res = backend.complete(messages, system)
+            out_tokens = TokenCounter.count(res)
+            self.tokens_consumed["output"] += out_tokens
+            self.tokens_consumed["total"] += out_tokens
+            return res
         except Exception as e:
             # Try fallback on failure
             print(f"[Router] {profile.value} failed: {e} — trying fallback...")
             fallback = self._find_fallback(profile)
             if fallback != profile:
-                return self.backends[fallback].complete(messages, system)
+                res = self.backends[fallback].complete(messages, system)
+                out_tokens = TokenCounter.count(res)
+                self.tokens_consumed["output"] += out_tokens
+                self.tokens_consumed["total"] += out_tokens
+                return res
             raise
 
     def _find_fallback(self, exclude: AgentProfile = None) -> AgentProfile:

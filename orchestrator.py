@@ -264,6 +264,21 @@ class JarvisOrchestrator:
         if skill_result:
             return skill_result
 
+        # EventBus Task start telemetry
+        import uuid
+        from events.bus import get_event_bus
+        from events.types import TaskEvent
+        
+        task_id = str(uuid.uuid4())
+        event_bus = get_event_bus()
+        
+        event_bus.publish(TaskEvent(
+            topic="task.react.start",
+            task_id=task_id,
+            goal=user_input,
+            status="started"
+        ))
+
         memory_ctx = self._recall_context(user_input)
         augmented  = f"{memory_ctx}{user_input}" if memory_ctx else user_input
 
@@ -275,6 +290,7 @@ class JarvisOrchestrator:
         system   = self._build_system()
 
         final_response = ""
+        success = True
 
         for step in range(MAX_REACT_STEPS):
             t_start = time.monotonic()
@@ -283,6 +299,13 @@ class JarvisOrchestrator:
                 response = self.router.run(profile, self.working_memory.get(), system)
             except Exception as e:
                 final_response = f"Backend error: {e}"
+                success = False
+                event_bus.publish(TaskEvent(
+                    topic="task.react.failed",
+                    task_id=task_id,
+                    goal=user_input,
+                    status=f"error: {e}"
+                ))
                 break
 
             latency_ms = int((time.monotonic() - t_start) * 1000)
@@ -321,6 +344,15 @@ class JarvisOrchestrator:
 
         self.working_memory.add("assistant", final_response)
         self._store_exchange(user_input, final_response)
+        
+        if success:
+            event_bus.publish(TaskEvent(
+                topic="task.react.completed",
+                task_id=task_id,
+                goal=user_input,
+                status="completed"
+            ))
+            
         return final_response
 
     def consolidate_on_exit(self) -> str:
