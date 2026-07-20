@@ -1,531 +1,180 @@
-<div align="center">
+# 🤖 BR JARVIS MK37 — Next-Gen AI Assistant & OS Automation
 
-# 🤖 J.A.R.V.I.S — MK37
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Engine](https://img.shields.io/badge/Engine-Gemini--Native-orange.svg)](https://ai.google.dev/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
-**Just A Rather Very Intelligent System**
-
-*A multi-modal, multi-backend AI assistant that transforms your OS into a living, intelligent platform.*
-
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)]()
-[![Tools](https://img.shields.io/badge/Tools-47-orange)]()
-[![Skills](https://img.shields.io/badge/Skills-45-purple)]()
-[![Agents](https://img.shields.io/badge/Sub--Agents-8-red)]()
-
-*Engineered by [Bharth Raj](https://github.com/bharthraj1412)*
-
-</div>
+> **BR JARVIS MK37** is an autonomous, multi-modal cognitive assistant that turns natural language into direct system actions, desktop automation, multi-agent workflows, and real-time intelligence — running online or 100% offline.
 
 ---
 
-## 📋 Table of Contents
+## 💡 Key Highlights
 
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Architecture](#-architecture)
-- [Quick Start](#-quick-start)
-- [Usage](#-usage)
-- [Tool Registry (47 Tools)](#-tool-registry-47-tools)
-- [Skill Library (45 Skills)](#-skill-library-45-skills)
-- [Sub-Agent System (8 Agents)](#-sub-agent-system-8-agents)
- [Developer Walkthrough](#-developer-walkthrough)
+- ⚡ **Gemini-First Core**: Powered by Google Gemini 2.5/3.5 with native Google Search grounding, multi-modal vision, and structured ReAct reasoning.
+- 🔀 **Multi-Backend Intelligence**: Seamlessly switch between **Gemini**, **OpenAI/GPT**, **Anthropic Claude**, **Local Ollama** (100% offline), **NVIDIA NIM**, and **Mistral**.
+- 🚀 **Parallel Task Queue**: Execute multiple complex goals simultaneously using a 3-worker multi-threaded agent execution engine.
+- 🛠️ **93 Tools & 71 Skills**: Desktop/OS automation (keyboard, mouse, windows), local RAG document database, Web scraping & browsing, code generation, audio/video transcription, and image/video creation.
+- 🎙️ **Hands-Free Voice & 90+ Languages**: Real-time voice interaction with lenient wake-word detection (*"Hey Jarvis"*), local OpenAI Whisper STT, and Google TTS.
+- 📚 **Local RAG Document Chat**: Upload PDFs, DOCX, CSVs, or web pages into a local ChromaDB vector database and chat with your files securely.
 
 ---
 
-## 🧠 Overview
+## 📊 System Architecture
 
-**JARVIS MK37** is a production-grade, multi-modal AI assistant platform featuring:
-
-- **Voice Interface** — Real-time conversation via Gemini Live with native audio I/O
-- **CLI Orchestrator** — ReAct-loop terminal for chained, autonomous multi-step task execution
-- **Multi-Backend Routing** — Intelligent dispatch across 6 LLM providers (Gemini, Anthropic, OpenAI, Mistral, NVIDIA NIM, Ollama)
-- **47 Deterministic Tools** — From web search and code sandboxing to red-team recon and full desktop automation
-- **45 Reusable Skills** — Professional prompt templates for DevOps, security, data analysis, and more
-- **8 Sub-Agent Types** — Spawn isolated worker agents for parallel, specialized workflows
-- **Persistent Memory** — ChromaDB vector embeddings + SQLite session history with semantic linking
-
-Whether you're automating DevSecOps workflows, controlling your desktop by voice, or running full penetration test reconnaissance — JARVIS MK37 handles it locally, privately, and with zero subscriptions when running Ollama.
-
----
-
-## ⚡ Key Features
-
-| Category | Capabilities |
-|---|---|
-| **Voice & Vision** | Real-time Gemini Live audio, screen capture analysis, webcam vision processing |
-| **Multi-Backend AI** | Gemini • Anthropic Claude • OpenAI GPT • Mistral • NVIDIA NIM • Ollama (100% offline) |
-| **Desktop Automation** | Mouse/keyboard control, AI-powered screen element detection, window management |
-| **System Control** | App launching, file management, system monitoring, computer settings (brightness, volume, WiFi) |
-| **Code Execution** | Sandboxed Python/JS/Bash/PowerShell execution with timeout and isolation |
-| **Web Intelligence** | DuckDuckGo search, headless browser page fetching, raw HTTP scraping |
-| **Red Team / OSINT** | Port scanning, DNS enumeration, HTTP header audits, WHOIS, nmap integration |
-| **Sub-Agents** | Threaded worker agents (coder, reviewer, researcher, tester, editor, sysadmin, devops) |
-| **Memory Engine** | ChromaDB vector similarity, persistent file-based memory, working memory with consolidation |
-| **Screen Sharing** | WebSocket-based real-time desktop broadcasting with multi-monitor support |
-| **Game Management** | Steam & Epic Games library management, update scheduling, download monitoring |
-| **Media** | YouTube search/play/summarize/trending, flight search via Google Flights |
-
----
-
-## 🏗 Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    JARVIS MK37                          │
-├──────────────┬──────────────────────────────────────────┤
-│  main.py     │  main_mk37.py                           │
-│  Voice GUI   │  CLI Orchestrator (ReAct Loop)           │
-├──────────────┴──────────────────────────────────────────┤
-│                   router.py                             │
-│      Keyword-based intelligent backend routing          │
-├─────┬─────┬─────┬─────┬─────┬───────────────────────────┤
-│Gemini│Claude│GPT │Mistrl│NVIDIA│ Ollama (offline)       │
-├─────┴─────┴─────┴─────┴─────┴───────────────────────────┤
-│                tools/registry.py                        │
-│            47 tools · _run_async() helper               │
-├──────────────┬──────────────┬───────────────────────────┤
-│  actions/    │  redteam/    │  multi_agent/             │
-│  18 modules  │  scope+recon │  8 agent types            │
-├──────────────┴──────────────┴───────────────────────────┤
-│                  memory/                                │
-│  vector_store · memory_manager · persistent_store       │
-│  working · consolidator · context · scan                │
-├─────────────────────────────────────────────────────────┤
-│             skills/ (45 built-in)                       │
-│       YAML/Markdown prompt templates                    │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    User([User Voice / Text]) -->|Input| Interface[Dual UI: CLI / Voice GUI]
+    Interface -->|Parse Command| Router[Multi-Backend Router]
+    
+    Router -->|Primary Inference| Gemini[Gemini 2.5 Flash / Pro]
+    Router -->|Local/Offline| Ollama[Local Ollama Models]
+    Router -->|Cloud Fallbacks| Others[GPT / Claude / Nvidia / Mistral]
+    
+    Interface -->|Goal Pipeline| TaskQueue[Parallel Task Queue - 3 Workers]
+    TaskQueue -->|Execute| Planner[Dependency-Aware Planner]
+    
+    Planner -->|Invoke| ToolRegistry[Tool & Skill Registry - 93 Tools / 71 Skills]
+    
+    ToolRegistry -->|Control| Desktop[OS Automation: Sound, Windows, Mouse, Keyboard]
+    ToolRegistry -->|Search| RAG[ChromaDB Local RAG Library]
+    ToolRegistry -->|Search Grounding| Web[Gemini Google Search Grounding]
+    ToolRegistry -->|Media| AI[Imagen 3 / Veo AI Generation & Whisper STT]
 ```
 
-### Backend Routing
-
-The `router.py` engine uses keyword-based routing to dispatch tasks to the optimal backend:
-
-| Backend | Optimized For | Offline? |
-|---|---|---|
-| **Gemini** | Search, long context, vision, general chat | No |
-| **Anthropic Claude** | Coding, security analysis, structured output | No |
-| **OpenAI GPT** | Creative tasks, broad knowledge | No |
-| **Mistral** | Fast inference, multilingual | No |
-| **NVIDIA NIM** | GPU-accelerated inference | No |
-| **Ollama** | Privacy-first, fully local | ✅ Yes |
-
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start (3 Steps)
 
-### Prerequisites
-
-- **Python 3.11+** (tested on 3.11, 3.12, 3.14)
-- **Git**
-- A microphone + speakers (for voice mode)
-
-### Installation
+### Step 1: Clone & Install Dependencies
 
 ```bash
 # Clone the repository
-git clone https://github.com/bharthraj1412/jarvis.git
-cd jarvis
+git clone https://github.com/bharthraj1412/BrJarvis.git
+cd BrJarvis
 
-# Create virtual environment
-python -m venv venv
-
-# Activate (Windows)
-venv\Scripts\activate
-# Activate (macOS/Linux)
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+# Install Python requirements
 pip install -r requirements_mk37.txt
-
-# Install browser automation (for web tools)
-playwright install
 ```
 
-### Configuration
+### Step 2: Configure Environment
 
-1. Copy `.env.template` to `.env` and fill in your API keys:
-   ```
-   GEMINI_API_KEY=your_key_here
-   ANTHROPIC_API_KEY=your_key_here     # optional
-   OPENAI_API_KEY=your_key_here        # optional
-   MISTRAL_API_KEY=your_key_here       # optional
-   ```
+Copy `.env.template` to `.env` and add your **Gemini API Key** (Free tier available at [Google AI Studio](https://aistudio.google.com/app/apikey)):
 
-2. Create `config/api_keys.json`:
-   ```json
-   {
-     "gemini_api_key": "your_gemini_key"
-   }
-   ```
+```bash
+cp .env.template .env
+```
 
-> **💡 Minimum requirement:** Only a Gemini API key is needed. All other backends are optional and degrade gracefully.
+Edit your `.env` file:
+```env
+GEMINI_API_KEY=your_actual_gemini_api_key_here
+JARVIS_ASSISTANT_NAME=BR
+JARVIS_WAKE_WORD=hey
+```
 
+### Step 3: Launch BR JARVIS
 
-## 🎯 Usage
+```bash
+# Terminal / CLI Mode (Recommended)
+python main_mk37.py
 
-### Option 1: Voice Interface
-
+# Voice Assistant Mode (Requires Microphone)
 python main.py
+
+# Full Interactive Launcher Menu
+python start.py
 ```
-
-Opens a native GUI with real-time voice conversation powered by Gemini Live. Features:
-- Push-to-talk and always-on listening modes
-- Mute toggle (F4)
-- Full tool execution via voice commands
-- Real-time output/input transcription logging
-
-|---|---|
-| `/skills` | List all available skills |
-| `/memory` | Browse persistent memories |
-| `/agents` | List active sub-agents |
-| `/mode recon` | Switch persona (recon, exploit, coder, analyst, general) |
-| `/install-skills` | Install skills from external GitHub repos |
-| `/quit` | Exit (auto-consolidates working memory) |
-
-### Option 3: Auto-Start (Windows)
-
-```bash
-python install_startup.py
-```
-
-Installs a silent background launcher that starts JARVIS automatically on Windows login.
-
-### Option 4: Startup Smoke Checks
-
-```bash
-python start.py smoke
-```
-
-Runs non-destructive checks for permissions, router fallback behavior, skills, tools, and scope config.
 
 ---
 
-## 🔧 Tool Registry (47 Tools)
+## 🎮 How to Use BR JARVIS
 
-### Web & Search
-| Tool | Description |
-|---|---|
-| `web_search` | DuckDuckGo search with configurable result count |
-| `fetch_page` | Headless browser page text extraction |
-| `fetch_raw` | Raw HTTP GET content fetching |
+### 1. Interactive CLI Mode (`python main_mk37.py`)
+Type natural language prompts or use fast `/` slash commands:
 
-### Code Execution
-| Tool | Description |
-|---|---|
-| `run_code` | Sandboxed Python/JS/Bash execution with timeout |
+- `search AI news and summarize the top 3 headlines`
+- `create a python script to parse CSV files`
+- `/run search news | open browser | check disk space` *(Runs 3 tasks in parallel!)*
+- `/chat-pdf path/to/document.pdf` *(RAG Document Chat)*
+- `/status` *(Check active system backends and tools)*
 
-### File Management
-| Tool | Description |
-|---|---|
-| `file_read` | Read workspace files |
-| `file_write` | Write to workspace files |
-| `file_list` | List workspace directory contents |
-
-### Desktop Automation
-| Tool | Description |
-|---|---|
-| `cursor_move` / `cursor_click` | Mouse positioning and clicking |
-| `keyboard_type` / `keyboard_hotkey` / `keyboard_press` | Text input and key combos |
-| `screen_find` / `screen_click` / `smart_click` | AI-powered visual element detection |
-| `clipboard_read` / `clipboard_write` | Clipboard operations |
-| `focus_window` | Bring windows to foreground |
-| `take_screenshot` | Screen capture |
-| `mouse_scroll` / `mouse_drag` | Scrolling and drag operations |
-
-### Red Team / Security
-| Tool | Description |
-|---|---|
-| `port_scan` | Scope-checked TCP port scanning |
-| `dns_enum` | DNS record enumeration (A, MX, NS, TXT, CNAME) |
-| `headers_audit` | HTTP security header analysis |
-| `whois_lookup` | Domain WHOIS information |
-| `nmap_scan` | Service scan (requires nmap) |
-| `generate_report` | Professional pentest report generation |
-
-### Memory
-| Tool | Description |
-|---|---|
-| `memory_save` / `memory_delete` | Persistent memory CRUD |
-| `memory_search` / `memory_list` | Memory search and browsing |
-
-### Sub-Agents
-| Tool | Description |
-|---|---|
-| `spawn_agent` | Launch autonomous worker agents |
-| `send_message` / `check_agent` / `list_agents` | Agent communication and monitoring |
-| `list_agent_types` | Show available agent definitions |
-
-### Skills
-| Tool | Description |
-|---|---|
-| `run_skill` / `list_skills` | Execute and browse reusable skills |
-
-### System
-| Tool | Description |
-|---|---|
-| `system_monitor` | CPU, RAM, disk, network, process telemetry |
-| `screen_share_start` / `screen_share_stop` / `screen_share_status` | WebSocket desktop broadcasting |
-| `list_monitors` | Multi-monitor enumeration |
+### 2. Hands-Free Voice Mode (`python main.py`)
+Say **"Hey Jarvis"** followed by your command:
+- *"Hey Jarvis, open Spotify and turn the volume to 50%"*
+- *"Hey Jarvis, search the web for quantum computing updates"*
+- *"Hey Jarvis, take a screenshot and tell me what's on screen"*
 
 ---
 
-## 📚 Skill Library (45 Skills)
+## 🛠️ Main Features Breakdown
 
-Skills are reusable prompt templates executed via the `/skills` system or the `run_skill` tool.
-
-### Core Development
-| Skill | Description |
+| Feature | Description |
 |---|---|
-| `commit` | Git commit with structured messages |
-| `review` / `code_review` | Code review with severity levels |
-| `edit` | Precise file editing with minimal changes |
-| `refactor` | Refactor without changing behavior |
-| `tdd` | Test-driven development workflow |
-
-### DevOps & Infrastructure
-| Skill | Description |
-|---|---|
-| `docker_deploy` / `docker_compose` | Docker container management |
-| `ci_cd` | CI/CD pipeline generation (GitHub Actions, GitLab CI) |
-| `nginx_config` | Nginx configuration generation |
-| `terraform_gen` | Infrastructure-as-Code templates |
-| `env_setup` | Development environment setup |
-| `cron_scheduler` | Scheduled task creation |
-
-### Security & OSINT
-| Skill | Description |
-|---|---|
-| `security_scan` | Automated security scanning |
-| `osint_recon` | Open-source intelligence gathering |
-| `ssl_check` | SSL/TLS certificate auditing |
-| `hash_lookup` | File hash computation and lookup |
-| `log_analysis` | Security log threat analysis |
-| `dep_audit` | Dependency vulnerability audit |
-
-### Data & APIs
-| Skill | Description |
-|---|---|
-| `csv_analysis` | CSV/JSON data analysis |
-| `json_transform` | JSON format transformation |
-| `regex_builder` | Regex pattern building and testing |
-| `db_query` | SQL query writing and optimization |
-| `chart_gen` | Data visualization generation |
-| `api_design` | RESTful API design |
-
-### Editor Integration
-| Skill | Description |
-|---|---|
-| `editor_open` / `editor_goto` | File navigation in VS Code/Cursor |
-| `editor_insert` / `editor_replace` | Direct code editing |
-| `editor_terminal` | Integrated terminal commands |
-
-### Documentation & Communication
-| Skill | Description |
-|---|---|
-| `doc_gen` | Technical documentation generation |
-| `changelog` | Changelog from git history |
-| `meeting_notes` | Structured meeting notes |
-| `email_draft` | Professional email drafting |
-
-### System Administration
-| Skill | Description |
-|---|---|
-| `system_info` | System diagnostics report |
-| `process_mgr` | Process monitoring and management |
-| `network_diag` | Network troubleshooting |
-| `disk_cleanup` | Disk space analysis |
-
-### Specialized
-| Skill | Description |
-|---|---|
-| `github_scan` | GitHub repository analysis |
-| `screenshot_fix` | Visual error detection and auto-fix |
-| `project_scaffold` | Full project generation from description |
-| `site_monitor` | Website uptime monitoring |
-| `research` | Deep web research with citations |
-| `pc_control` | Desktop automation workflows |
-| `git_flow` | Git branch management |
+| **Parallel Goals (`/run`)** | Execute independent tasks concurrently using multi-threaded execution. |
+| **Local RAG Library** | Store and query PDFs, DOCX, CSVs, and Web pages locally via ChromaDB vector database. |
+| **OS Automation** | Control volume, open applications, simulate keystrokes, lock screen, and take screenshots. |
+| **AI Writing & Code** | Write emails, generate code, debug scripts, refactor projects, and run code in a sandbox. |
+| **Media Generation** | Create AI images (Gemini Imagen / DALL-E) and videos (Google Veo / Kling AI). |
+| **Offline STT & Audio** | Transcribe MP3/MP4 files offline using local OpenAI Whisper. |
+| **Global Hotkeys** | Instant actions via system shortcuts (`Ctrl+Shift+J` for Voice, `Ctrl+Shift+S` for Vision). |
 
 ---
 
-## 🤖 Sub-Agent System (8 Agents)
+## 💬 Essential CLI Slash Commands
 
-JARVIS can delegate complex workflows by spawning threaded sub-agents that operate independently within the ReAct loop.
+| Command | Action |
+|---|---|
+| `/run goal1 \| goal2 \| goal3` | Run multiple goals in **parallel** |
+| `/tasks` | View active and queued background tasks |
+| `/chat-pdf <file>` | Ingest and chat with a PDF document |
+| `/chat-webpage <url>` | Scrape and chat with any webpage content |
+| `/skills` | List all 71 available skills |
+| `/memory search <query>` | Search past conversations and memories |
+| `/status` | View AI backend status and operational health |
+| `/help` | Show full list of commands |
+| `/quit` | Exit assistant and save session context |
 
-| Agent | Specialization | Tools |
+---
+
+## 🌐 Multi-Backend Configuration
+
+BR JARVIS defaults to **Google Gemini** for high performance and low latency, but can auto-fallback or route to other backends configured in `.env` or `config/api_keys.json`:
+
+| Provider | Model Default | Capability |
 |---|---|---|
-| `general-purpose` | Multi-step research and task execution | All |
-| `coder` | Clean, idiomatic code writing and modification | All |
-| `reviewer` | Code quality, security, and correctness analysis | file_read, file_list, web_search |
-| `researcher` | Codebase exploration and evidence-based answers | file_read, file_list, web_search, fetch_page |
-| `tester` | Test writing and failure diagnosis | All |
-| `editor` | File editing via keyboard/mouse automation | file_*, run_code, keyboard_*, screen_* |
-| `sysadmin` | System configuration and service diagnostics | run_code, file_read, file_list, system_monitor |
-| `devops` | Docker, CI/CD, deployment, infrastructure | run_code, file_*, web_search, system_monitor |
-
-> **Custom agents:** Create `.md` files in `~/.jarvis/agents/` with YAML frontmatter to define custom agent types.
+| **Gemini** | `gemini-2.5-flash` | Real-time Search Grounding, Vision, Code, ReAct Orchestration |
+| **OpenAI** | `gpt-4o` | Complex reasoning, standard coding |
+| **Anthropic** | `claude-3-5-sonnet` | Advanced software engineering |
+| **Ollama** | `llama3` / `mistral` | 100% Offline execution without internet |
+| **NVIDIA NIM** | Configurable | Accelerated inference models |
 
 ---
 
-## 💾 Memory & Persistence
-
-JARVIS maintains full context between sessions through a layered memory system:
-
-### Working Memory
-- Short-term conversation context
-- Automatic trimming to stay within token limits
-- Consolidates to persistent storage on session exit
-
-### Persistent Memory (File-Based)
-- Markdown files with YAML frontmatter in `~/.jarvis/memory/`
-- Supports user, project, system, and insight memory types
-- Keyword search with freshness scoring and decay ranking
-
-### Vector Memory (ChromaDB)
-- Semantic similarity search via `all-MiniLM-L6-v2` embeddings
-- Graceful degradation — fully functional without chromadb installed
-- Automatic empty-collection handling
-
-### Session History (SQLite)
-- Complete session tracking with semantic linking
-- Cross-session context retrieval
-
----
-
-## 🛡 Red Team & Security
-
-### Permission System
-
-| Mode | Behavior |
-|---|---|
-| `ALLOW_ALL` | All tools execute immediately (default) |
-| `CONFIRM_ALL` | Only `ALWAYS_ALLOWED` safe tools execute without prompt |
-| `DENY_ALL` | Block all tools except explicit allow-list |
-
-Mode is set through `JARVIS_PERMISSION_MODE` and can also be sourced from `current_scope.json` (`permissions.mode`, `deny_tools`, `allow_tools`).
-
-### Scope Enforcement
-- Defined in `current_scope.json`
-- Restricts target hosts, domains, and allowed actions
-- All red-team tools check scope before execution
-- Persistent audit logging to `~/.jarvis/audit.log`
-
----
-
-## 📺 Screen Sharing
-
-Real-time WebSocket-based desktop broadcasting:
-
-```bash
-# Start sharing (from JARVIS or via tool)
-screen_share_start  # default: port 8765, 10 FPS, 60% quality
-
-# Open viewer
-# Navigate to screen_server/viewer.html in your browser
-```
-
-Features:
-- Multi-monitor support with `list_monitors`
-- Configurable FPS and JPEG quality
-- Built-in HTML5 viewer with auto-reconnect
-
----
-
-## ⚙ Configuration
-
-### Environment Variables
-
-| Variable | Description |
-|---|---|
-| `GEMINI_API_KEY` | Google Gemini API key (required) |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key (optional) |
-| `OPENAI_API_KEY` | OpenAI API key (optional) |
-| `MISTRAL_API_KEY` | Mistral AI API key (optional) |
-| `NVIDIA_API_KEY` | NVIDIA NIM API key (optional) |
-| `OLLAMA_HOST` | Ollama server URL (default: http://localhost:11434) |
-| `JARVIS_DENY_TOOLS` | Comma-separated list of blocked tools |
-
-### File Structure
+## 📂 Project Structure
 
 ```
-Jarvis-MK37/
-├── main.py                 # Voice GUI interface
-├── main_mk37.py            # CLI orchestrator
-├── orchestrator.py          # ReAct loop engine
-├── router.py               # Multi-backend routing
-├── start.py                # Unified launcher
-├── actions/                # 18 action modules
-│   ├── browser_control.py
-│   ├── computer_control.py
-│   ├── computer_settings.py
-│   ├── flight_finder.py
-│   ├── game_updater.py
-│   ├── screen_share.py
-│   ├── youtube_video.py
-│   └── ...
-├── agent/                  # Task executor + planner
-│   ├── executor.py
-│   ├── planner.py
-│   └── error_handler.py
-├── memory/                 # Memory subsystem
-│   ├── vector_store.py
-│   ├── memory_manager.py
-│   ├── persistent_store.py
-│   ├── working.py
-│   └── consolidator.py
-├── multi_agent/            # Sub-agent system
-│   └── subagent.py
-├── tools/                  # Tool registry + web tools
-│   ├── registry.py
-│   ├── web.py
-│   ├── sandbox.py
-│   └── files.py
-├── redteam/                # Security tooling
-│   ├── scope.py
-│   ├── recon.py
-│   └── vuln_scanner.py
-├── skills/                 # 45 built-in skills
-├── screen_server/          # WebSocket screen sharing
-│   └── viewer.html
-├── config/                 # API keys + model config
-├── *_backend.py            # 6 LLM backend adapters
-└── requirements*.txt       # Dependencies
+BrJarvis/
+├── actions/             # OS automation, RAG, Media, & Search action modules
+├── agent/               # Autonomous ReAct planner, task executor, & queue
+├── backends/            # LLM provider clients (Gemini, OpenAI, Claude, Ollama)
+├── config/              # User settings, vocabulary overrides, & hotkeys
+├── core/                # System core runtime & hardware monitor
+├── memory/              # Conversation history & ChromaDB RAG storage
+├── skills/              # Built-in modular capabilities & writer tools
+├── voice/               # Speech-To-Text (Whisper/Google) & Text-To-Speech (TTS)
+├── main_mk37.py         # Primary CLI REPL Entry Point
+├── main.py              # Primary Voice Assistant Entry Point
+└── start.py             # System Launcher Menu
 ```
 
 ---
 
-## 🔄 Recent Updates (v37.1 — April 2026)
+## 🤝 Contributing
 
-### Bug Fixes (15 fixes across 8 files)
-- **Critical:** Fixed crash on startup without chromadb — now degrades gracefully
-- **Critical:** Fixed sub-agent crash when spawned from voice mode (orchestrator=None)
-- **Critical:** Fixed YouTube TTS silence — speak parameter now correctly passed
-- **Major:** Fixed `asyncio.run()` inside running event loop — new `_run_async()` helper
-- **Major:** Fixed `_VoiceBridge` missing attributes for fork-mode skills
-- **Major:** Fixed `mk37_chat` overwriting voice session's orchestrator reference
-- **Major:** Replaced fragile `from config import` with portable `platform.system()` helpers
-- **Minor:** Fixed dict mutation during memory trimming iteration
-- **Minor:** Fixed `winreg` import on non-Windows platforms
-- **Minor:** Hidden skills no longer shown in `/skills` list
-- **Minor:** Empty memory search returns friendly message instead of empty string
-- **Minor:** Empty ChromaDB collection query handled safely
-
-### Dependency Updates
-- Installed `psutil` for system monitoring
-- Installed `youtube-transcript-api` for video summarization
+Contributions are welcome! Feel free to open an **Issue** or submit a **Pull Request** to add new tools, skills, or backends.
 
 ---
 
-## 👤 Author
+## 📜 License
 
-Developed and maintained by **Bharth Raj** — [@bharthraj1412](https://github.com/bharthraj1412)
-
----
-
-<div align="center">
-
-⭐ **Star this repository to support the journey to Mark 85!** ⭐
-
-</div>
+Distributed under the **MIT License**. See `LICENSE` for details.
