@@ -123,3 +123,9 @@ def _build_global_policy() -> PermissionPolicy:
 
 
 PERMISSIONS = _build_global_policy()
+
+
+def check_permission(tool_name: str, args: dict | None = None) -> bool:
+    """Check if tool execution is permitted under global policy."""
+    return PERMISSIONS.check(tool_name)
+
