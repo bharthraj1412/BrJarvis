@@ -1,22 +1,27 @@
-# 🤖 BR JARVIS MK37 — Next-Gen AI Assistant & OS Automation
+# 🧠 BR JARVIS — Local-First AI Operating System
 
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![CI](https://github.com/bharthraj1412/BrJarvis/actions/workflows/ci.yml/badge.svg)](https://github.com/bharthraj1412/BrJarvis/actions)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Engine](https://img.shields.io/badge/Engine-Gemini--Native-orange.svg)](https://ai.google.dev/)
+[![Tests](https://img.shields.io/badge/tests-45%2F45%20passing-brightgreen.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
-> **BR JARVIS MK37** is an autonomous, multi-modal cognitive assistant that turns natural language into direct system actions, desktop automation, multi-agent workflows, and real-time intelligence — running online or 100% offline.
+> **BR JARVIS** is not a chatbot. It is a **Local-First AI Operating System** — a modular, production-grade cognitive platform that understands your computer, reasons about goals, and executes complex tasks through voice, vision, automation, memory, and planning.
 
 ---
 
-## 💡 Key Highlights
+## 🚀 What Makes BR JARVIS Different
 
-- ⚡ **Gemini-First Core**: Powered by Google Gemini 2.5/3.5 with native Google Search grounding, multi-modal vision, and structured ReAct reasoning.
-- 🔀 **Multi-Backend Intelligence**: Seamlessly switch between **Gemini**, **OpenAI/GPT**, **Anthropic Claude**, **Local Ollama** (100% offline), **NVIDIA NIM**, and **Mistral**.
-- 🚀 **Parallel Task Queue**: Execute multiple complex goals simultaneously using a 3-worker multi-threaded agent execution engine.
-- 🛠️ **93 Tools & 71 Skills**: Desktop/OS automation (keyboard, mouse, windows), local RAG document database, Web scraping & browsing, code generation, audio/video transcription, and image/video creation.
-- 🎙️ **Hands-Free Voice & 90+ Languages**: Real-time voice interaction with lenient wake-word detection (*"Hey Jarvis"*), local OpenAI Whisper STT, and Google TTS.
-- 📚 **Local RAG Document Chat**: Upload PDFs, DOCX, CSVs, or web pages into a local ChromaDB vector database and chat with your files securely.
+| | Traditional Chatbots | BR JARVIS |
+|---|---|---|
+| **Architecture** | Single prompt → response | 12-subsystem modular OS with EventBus, DI, and DAG execution |
+| **Execution** | Text replies only | Autonomous multi-step task execution with parallel workers |
+| **Memory** | Session-only context | Persistent vector memory + TTL cache + archival system |
+| **Vision** | None | Real-time screen capture, OCR, UI element detection |
+| **Desktop Control** | None | Full keyboard, mouse, clipboard, and window management |
+| **Safety** | None | Permission policies, risk assessment, human-in-the-loop interlocks |
+| **Testing** | None | 45 automated tests (unit + integration), CI/CD pipeline |
 
 ---
 
@@ -24,129 +29,150 @@
 
 ```mermaid
 graph TD
-    User([User Voice / Text]) -->|Input| Interface[Dual UI: CLI / Voice GUI]
-    Interface -->|Parse Command| Router[Multi-Backend Router]
-    
-    Router -->|Primary Inference| Gemini[Gemini 2.5 Flash / Pro]
-    Router -->|Local/Offline| Ollama[Local Ollama Models]
-    Router -->|Cloud Fallbacks| Others[GPT / Claude / Nvidia / Mistral]
-    
-    Interface -->|Goal Pipeline| TaskQueue[Parallel Task Queue - 3 Workers]
-    TaskQueue -->|Execute| Planner[Dependency-Aware Planner]
-    
-    Planner -->|Invoke| ToolRegistry[Tool & Skill Registry - 93 Tools / 71 Skills]
-    
-    ToolRegistry -->|Control| Desktop[OS Automation: Sound, Windows, Mouse, Keyboard]
-    ToolRegistry -->|Search| RAG[ChromaDB Local RAG Library]
-    ToolRegistry -->|Search Grounding| Web[Gemini Google Search Grounding]
-    ToolRegistry -->|Media| AI[Imagen 3 / Veo AI Generation & Whisper STT]
+    User([👤 User — Voice / Text]) --> Interface[🖥️ Dual Interface: CLI + Voice GUI]
+
+    Interface --> Router[🔀 Multi-Backend Router<br/>Token Budget Tracking]
+    Interface --> TaskQueue[⚡ Parallel Task Queue<br/>3 Workers]
+
+    Router --> Gemini[Gemini 2.5/3.5 Flash]
+    Router --> Ollama[Local Ollama — Offline]
+    Router --> Others[GPT / Claude / NVIDIA / Mistral]
+
+    TaskQueue --> Planner[🧠 DAG Planner Engine<br/>Risk Assessment + Replanning]
+    Planner --> Executor[🚀 Parallel Execution Engine<br/>Emergency Stop + Interlocks]
+
+    Executor --> ToolRuntime[🔧 Tool Runtime Engine<br/>93 Tools — Sandboxed + Cached]
+    Executor --> VisionEngine[👁️ Vision Engine<br/>Screen Capture + OCR + FNV-1a Hash]
+    Executor --> ComputerOp[🖱️ Computer Operator<br/>Mouse + Keyboard + Clipboard]
+
+    ToolRuntime --> Desktop[OS Automation]
+    ToolRuntime --> RAG[ChromaDB RAG Library]
+    ToolRuntime --> Web[Gemini Search Grounding]
+    ToolRuntime --> AI[Imagen 3 / Veo / Whisper]
+
+    subgraph Core Infrastructure
+        EventBus[📡 EventBus — Pub/Sub + Audit]
+        Memory[💾 Unified Memory — Cache + Archive + Vector]
+        Context[📋 Context Engine — Token Budgeting]
+        DI[🔩 DI Container + Lifecycle Manager]
+    end
+
+    Executor -.-> EventBus
+    Router -.-> EventBus
+    ToolRuntime -.-> Memory
+    Planner -.-> Context
 ```
 
 ---
 
-## ⚡ Quick Start (3 Steps)
+## 🏗️ Production-Grade Subsystems
 
-### Step 1: Clone & Install Dependencies
+BR JARVIS is built from **12 independent, tested subsystems** — each with its own Pydantic v2 models, EventBus integration, and DI registration:
+
+| # | Subsystem | Module | Key Capabilities |
+|---|---|---|---|
+| 1 | **Core Runtime** | `core/` | Pydantic config, DI container, lifecycle management, health monitoring |
+| 2 | **Event Bus** | `events/` | Async pub/sub, wildcard routing, dead letter queue, audit persistence |
+| 3 | **Context Engine** | `context/` | Token accounting (tiktoken), semantic compression, priority context assembly |
+| 4 | **Memory Engine** | `memory/` | TTL cache with FNV-1a hashing, memory archival, ChromaDB vector store |
+| 5 | **Planner Engine** | `agent/planner_engine.py` | DAG goal decomposition, risk classification (LOW→CRITICAL), replanning |
+| 6 | **Execution Engine** | `agent/executor_engine.py` | Multi-worker parallel execution, emergency stop, human approval interlocks |
+| 7 | **Tool Runtime** | `tools/tool_runtime.py` | Sandboxed execution, permission validation, result caching, telemetry |
+| 8 | **Plugin Platform** | `plugins/` | Dynamic loading, crash isolation, community plugin discovery |
+| 9 | **Vision Engine** | `vision/` | Screen capture (mss), FNV-1a frame dedup, OCR text extraction, UI element detection |
+| 10 | **Computer Operator** | `computer/` | Mouse/keyboard control (pyautogui), clipboard management, permission interlocks |
+| 11 | **Voice System** | `voice/` | Wake word detection, Whisper STT, Edge TTS, 90+ language support |
+| 12 | **Integration Bridge** | `core/integration.py` | Legacy↔new architecture wiring, EventBus telemetry on orchestrator & router |
+
+---
+
+## ⚡ Quick Start
+
+### 1. Clone & Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/bharthraj1412/BrJarvis.git
 cd BrJarvis
-
-# Install Python requirements
 pip install -r requirements_mk37.txt
 ```
 
-### Step 2: Configure Environment
+### 2. Configure API Key
 
-Copy `.env.template` to `.env` and add your **Gemini API Key** (Free tier available at [Google AI Studio](https://aistudio.google.com/app/apikey)):
+Copy `.env.template` → `.env` and add your [Gemini API Key](https://aistudio.google.com/app/apikey) (free tier available):
 
-```bash
-cp .env.template .env
-```
-
-Edit your `.env` file:
 ```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 JARVIS_ASSISTANT_NAME=BR
 JARVIS_WAKE_WORD=hey
 ```
 
-### Step 3: Launch BR JARVIS
+### 3. Launch
 
 ```bash
-# Terminal / CLI Mode (Recommended)
+# CLI Mode (Recommended)
 python main_mk37.py
 
-# Voice Assistant Mode (Requires Microphone)
+# Voice Assistant Mode
 python main.py
 
-# Full Interactive Launcher Menu
+# Interactive Launcher
 python start.py
 ```
 
 ---
 
-## 🎮 How to Use BR JARVIS
+## 🎮 Usage Examples
 
-### 1. Interactive CLI Mode (`python main_mk37.py`)
-Type natural language prompts or use fast `/` slash commands:
+### CLI Mode (`python main_mk37.py`)
 
-- `search AI news and summarize the top 3 headlines`
-- `create a python script to parse CSV files`
-- `/run search news | open browser | check disk space` *(Runs 3 tasks in parallel!)*
-- `/chat-pdf path/to/document.pdf` *(RAG Document Chat)*
-- `/status` *(Check active system backends and tools)*
+```
+> search AI news and summarize the top 3 headlines
+> create a python script to parse CSV files
+> /run search news | open browser | check disk space    ← 3 tasks in parallel!
+> /chat-pdf path/to/document.pdf                        ← RAG document chat
+> /status                                               ← backend health check
+```
 
-### 2. Hands-Free Voice Mode (`python main.py`)
+### Voice Mode (`python main.py`)
+
 Say **"Hey Jarvis"** followed by your command:
 - *"Hey Jarvis, open Spotify and turn the volume to 50%"*
-- *"Hey Jarvis, search the web for quantum computing updates"*
 - *"Hey Jarvis, take a screenshot and tell me what's on screen"*
+- *"Hey Jarvis, search the web for quantum computing updates"*
 
 ---
 
-## 🛠️ Main Features Breakdown
-
-| Feature | Description |
-|---|---|
-| **Parallel Goals (`/run`)** | Execute independent tasks concurrently using multi-threaded execution. |
-| **Local RAG Library** | Store and query PDFs, DOCX, CSVs, and Web pages locally via ChromaDB vector database. |
-| **OS Automation** | Control volume, open applications, simulate keystrokes, lock screen, and take screenshots. |
-| **AI Writing & Code** | Write emails, generate code, debug scripts, refactor projects, and run code in a sandbox. |
-| **Media Generation** | Create AI images (Gemini Imagen / DALL-E) and videos (Google Veo / Kling AI). |
-| **Offline STT & Audio** | Transcribe MP3/MP4 files offline using local OpenAI Whisper. |
-| **Global Hotkeys** | Instant actions via system shortcuts (`Ctrl+Shift+J` for Voice, `Ctrl+Shift+S` for Vision). |
-
----
-
-## 💬 Essential CLI Slash Commands
+## 💬 Slash Commands
 
 | Command | Action |
 |---|---|
-| `/run goal1 \| goal2 \| goal3` | Run multiple goals in **parallel** |
+| `/run goal1 \| goal2 \| goal3` | Execute multiple goals in **parallel** |
 | `/tasks` | View active and queued background tasks |
 | `/chat-pdf <file>` | Ingest and chat with a PDF document |
-| `/chat-webpage <url>` | Scrape and chat with any webpage content |
-| `/skills` | List all 71 available skills |
+| `/chat-webpage <url>` | Scrape and chat with any webpage |
+| `/skills` | List all 71+ available skills |
 | `/memory search <query>` | Search past conversations and memories |
-| `/status` | View AI backend status and operational health |
-| `/help` | Show full list of commands |
-| `/quit` | Exit assistant and save session context |
+| `/status` | View AI backend status and system health |
+| `/mode <name>` | Switch persona (recon / coder / planner / analyst) |
+| `/help` | Show full command list |
+| `/quit` | Exit and save session context |
 
 ---
 
-## 🌐 Multi-Backend Configuration
+## 🌐 Multi-Backend Router
 
-BR JARVIS defaults to **Google Gemini** for high performance and low latency, but can auto-fallback or route to other backends configured in `.env` or `config/api_keys.json`:
+BR JARVIS defaults to **Google Gemini** but intelligently routes tasks to the best available backend with automatic fallback:
 
-| Provider | Model Default | Capability |
-|---|---|---|
-| **Gemini** | `gemini-2.5-flash` | Real-time Search Grounding, Vision, Code, ReAct Orchestration |
-| **OpenAI** | `gpt-4o` | Complex reasoning, standard coding |
-| **Anthropic** | `claude-3-5-sonnet` | Advanced software engineering |
-| **Ollama** | `llama3` / `mistral` | 100% Offline execution without internet |
-| **NVIDIA NIM** | Configurable | Accelerated inference models |
+| Provider | Default Model | Best For | Required |
+|---|---|---|---|
+| **Gemini** | `gemini-2.5-flash` | Search grounding, vision, ReAct orchestration | ✅ Yes |
+| **OpenAI** | `gpt-4o` | Complex reasoning, coding | Optional |
+| **Anthropic** | `claude-3-5-sonnet` | Software engineering | Optional |
+| **Ollama** | `llama3` / `mistral` | 100% offline execution | Optional |
+| **NVIDIA NIM** | Configurable | GPU-accelerated inference | Optional |
+| **Mistral** | `mistral-large` | Fast inference, multilingual | Optional |
+
+The router tracks **token consumption** per request and emits `model.route.selected` events for monitoring.
 
 ---
 
@@ -154,24 +180,85 @@ BR JARVIS defaults to **Google Gemini** for high performance and low latency, bu
 
 ```
 BrJarvis/
-├── actions/             # OS automation, RAG, Media, & Search action modules
-├── agent/               # Autonomous ReAct planner, task executor, & queue
-├── backends/            # LLM provider clients (Gemini, OpenAI, Claude, Ollama)
-├── config/              # User settings, vocabulary overrides, & hotkeys
-├── core/                # System core runtime & hardware monitor
-├── memory/              # Conversation history & ChromaDB RAG storage
-├── skills/              # Built-in modular capabilities & writer tools
-├── voice/               # Speech-To-Text (Whisper/Google) & Text-To-Speech (TTS)
-├── main_mk37.py         # Primary CLI REPL Entry Point
-├── main.py              # Primary Voice Assistant Entry Point
-└── start.py             # System Launcher Menu
+├── .github/workflows/   # CI/CD pipeline (GitHub Actions)
+├── actions/             # OS automation, RAG, media, search modules
+├── agent/               # Planner engine, executor engine, task queue
+├── backends/            # LLM provider clients (Gemini, GPT, Claude, Ollama, NVIDIA, Mistral)
+├── br_archetecture/     # Engineering knowledge base & documentation
+├── computer/            # Desktop automation operator (mouse, keyboard, clipboard)
+├── config/              # User settings, vocabulary, hotkeys
+├── context/             # Token accounting & semantic context compression
+├── core/                # Runtime, DI container, lifecycle, health, retry, error middleware
+├── events/              # Async EventBus with pub/sub, audit store, DLQ
+├── memory/              # Unified memory (cache + archive + vector + conversation)
+├── multi_agent/         # Sub-agent spawning & coordination
+├── plugins/             # Dynamic plugin loading & crash isolation
+├── skills/              # 71+ built-in modular capabilities
+├── tools/               # 93 tools — unified registry + sandboxed runtime
+├── tests/               # 27 unit tests + 18 integration tests (45 total)
+│   └── integration/     # 30 scenario integration test suite
+├── vision/              # Screen capture, OCR, UI element detection
+├── voice/               # Whisper STT, Edge TTS, wake word, 90+ languages
+├── main_mk37.py         # CLI REPL entry point
+├── main.py              # Voice assistant entry point
+├── start.py             # System launcher menu
+└── server.py            # FastAPI REST/WebSocket server
 ```
+
+---
+
+## 🧪 Testing
+
+BR JARVIS maintains **45/45 tests passing** across unit and integration suites:
+
+```bash
+# Run full test suite
+python -m pytest tests/ -v
+
+# Run only integration tests
+python -m pytest tests/integration/ -v
+
+# Run smoke startup check
+python scripts/smoke_startup.py
+```
+
+### Test Coverage
+
+| Category | Tests | Scenarios Covered |
+|---|---|---|
+| Core Runtime | 6 | Config, DI, lifecycle, process supervisor, health monitor |
+| Event Bus | 3 | Pub/sub, event store query, dead letter queue |
+| Context Engine | 4 | Token counting, compression, context building |
+| Memory Engine | 3 | TTL cache, archival, unified memory |
+| Planner Engine | 2 | Risk assessment, failure replanning |
+| Execution Engine | 2 | Parallel DAG execution, human interlocks |
+| Tool Runtime | 2 | Registration, sandboxed execution |
+| Plugin Manager | 1 | Dynamic discovery |
+| Vision Engine | 3 | Screen capture, OCR, analysis pipeline |
+| Computer Operator | 1 | Action execution |
+| **Integration Suite** | **18** | **Vision+operator, file ops, terminal/git, memory persistence, parallel stability, API fallback, emergency stop, OCR accuracy** |
+
+---
+
+## 🛣️ Roadmap
+
+- [x] **Phase 1** — Core Subsystems Foundation (Subsystems 1–10)
+- [x] **Phase 1.5** — Integration & Validation (Bridge, tests, CI/CD, refactoring)
+- [ ] **Phase 2** — Reasoning Engine (Chain-of-thought, hypothesis, evidence evaluation)
+- [ ] **Phase 3** — Workflow Engine (DSL, conditional branching, loops)
+- [ ] **Phase 4** — Voice System Overhaul (Streaming STT/TTS, wake word engine)
+- [ ] **Phase 5** — Desktop UI Platform (Web dashboard, real-time monitors)
+- [ ] **Phase 6** — Enterprise & SDK (Plugin SDK, REST gateway, multi-tenant)
+
+See [ROADMAP.md](br_archetecture/ROADMAP.md) for detailed phase breakdowns.
 
 ---
 
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to open an **Issue** or submit a **Pull Request** to add new tools, skills, or backends.
+
+See [CONTRIBUTING.md](br_archetecture/CONTRIBUTING.md) for guidelines.
 
 ---
 
