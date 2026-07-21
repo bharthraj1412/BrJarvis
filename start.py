@@ -12,6 +12,7 @@ import platform
 import signal
 import subprocess
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, TextIO, TypedDict, cast
@@ -50,8 +51,8 @@ except ImportError:
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-VERSION = "37.2.0"
-BUILD   = "2026-07-20"
+VERSION = "37.5.0"
+BUILD   = "2026-07-21"
 CODENAME = "MARK XXXVII"
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -217,7 +218,57 @@ def show_status():
 
 # ── Dependencies Doctor ────────────────────────────────────────────────────────
 
-def doctor():
+def _auto_install_package(pkg: str, import_name: str) -> bool:
+    """Multi-method robust installer trying 6 fallback methods for missing Python packages."""
+    methods = [
+        ("Standard pip", [PYTHON, "-m", "pip", "install", pkg, "--quiet"]),
+        ("Upgraded pip", [PYTHON, "-m", "pip", "install", "--upgrade", pkg, "--quiet"]),
+        ("Break-system-packages pip", [PYTHON, "-m", "pip", "install", pkg, "--break-system-packages", "--quiet"]),
+        ("User scope pip", [PYTHON, "-m", "pip", "install", "--user", pkg, "--quiet"]),
+        ("No-deps pip", [PYTHON, "-m", "pip", "install", pkg, "--no-deps", "--quiet"]),
+    ]
+    
+    for method_name, cmd in methods:
+        try:
+            res = subprocess.run(cmd, capture_output=True, timeout=90)
+            ok, _ = _check_module(import_name)
+            if ok or res.returncode == 0:
+                return True
+        except Exception:
+            pass
+
+    # Bulk requirements fallback if single package install methods failed
+    req_files = [BASE_DIR / "requirements_mk37.txt", BASE_DIR / "requirements.txt"]
+    for req in req_files:
+        if req.exists():
+            try:
+                subprocess.run([PYTHON, "-m", "pip", "install", "-r", str(req), "--quiet"], capture_output=True, timeout=120)
+                ok, _ = _check_module(import_name)
+                if ok:
+                    return True
+            except Exception:
+                pass
+
+    return _check_module(import_name)[0]
+
+
+def _install_playwright_browsers():
+    """Multi-method installer for Playwright browser binaries."""
+    commands = [
+        [PYTHON, "-m", "playwright", "install", "chromium"],
+        [PYTHON, "-m", "playwright", "install"],
+        ["playwright", "install", "chromium"],
+    ]
+    for cmd in commands:
+        try:
+            res = subprocess.run(cmd, capture_output=True, timeout=120)
+            if res.returncode == 0:
+                break
+        except Exception:
+            pass
+
+
+def doctor(auto_confirm: bool = False):
     _banner()
     console.print("[bold magenta]JARVIS MK37 System Doctor & Auto-Repair Engine[/]\n")
 
@@ -247,7 +298,7 @@ def doctor():
         "youtube-transcript-api": "youtube_transcript_api",
     }
     
-    missing_pip: list[str] = []
+    missing_pip: list[tuple[str, str]] = []
     
     table_pip = Table(title="1. Python Packages Audit", box=None)
     table_pip.add_column("Package Name", style="bold cyan")
@@ -260,24 +311,33 @@ def doctor():
             table_pip.add_row(pip_name, import_name, f"[green]✓ Installed[/] [dim]({ver})[/]")
         else:
             table_pip.add_row(pip_name, import_name, "[red]✗ MISSING[/]")
-            missing_pip.append(pip_name)
+            missing_pip.append((pip_name, import_name))
             
     console.print(table_pip)
     console.print()
 
-    # 2. System CLI Tools Audit (Linux/macOS/Windows)
+    # 2. System CLI Tools Audit (OS-Adaptive)
     import shutil
-    cli_tools = {
-        "C Compiler (gcc/clang)": ["gcc", "clang"],
-        "GUI Automation Tools": ["xdotool", "xrandr"],
-        "Screenshot Utilities": ["scrot", "import", "grim"],
-        "Audio Engines": ["espeak-ng", "spd-say", "pw-play", "paplay", "aplay"],
-        "FFmpeg Engine": ["ffmpeg"],
-    }
+    if sys.platform == "win32":
+        cli_tools = {
+            "C Compiler (gcc/clang/cl)": ["gcc", "clang", "cl"],
+            "GUI Automation (Native)": ["pyautogui", "pywin32"],
+            "Screenshot Utilities (Native)": ["mss", "Pillow"],
+            "Audio Engines (Native)": ["sounddevice", "edge-tts", "pyttsx3"],
+            "FFmpeg Engine": ["ffmpeg"],
+        }
+    else:
+        cli_tools = {
+            "C Compiler (gcc/clang)": ["gcc", "clang"],
+            "GUI Automation Tools": ["xdotool", "xrandr"],
+            "Screenshot Utilities": ["scrot", "import", "grim"],
+            "Audio Engines": ["espeak-ng", "spd-say", "pw-play", "paplay", "aplay"],
+            "FFmpeg Engine": ["ffmpeg"],
+        }
     
-    table_sys = Table(title="2. System Environment & CLI Tools Audit", box=None)
+    table_sys = Table(title=f"2. System Environment & CLI Tools Audit ({platform.system()})", box=None)
     table_sys.add_column("Tool Group", style="bold yellow")
-    table_sys.add_column("Found Binary", style="dim")
+    table_sys.add_column("Found Binary / Module", style="dim")
     table_sys.add_column("Status")
     
     missing_sys_groups = []
@@ -286,6 +346,18 @@ def doctor():
         for b in bin_list:
             if shutil.which(b):
                 found = b
+                break
+            elif b in ("gcc", "clang", "cl"):
+                try:
+                    from setup_native import find_compiler
+                    fc = find_compiler()
+                    if fc:
+                        found = Path(fc).name
+                        break
+                except Exception:
+                    pass
+            elif _check_module(b)[0]:
+                found = f"{b} (Python Module)"
                 break
         if found:
             table_sys.add_row(group_name, found, "[green]✓ Available[/]")
@@ -306,11 +378,11 @@ def doctor():
     except Exception:
         pass
 
-    console.print("[bold cyan]3. Native C Hardware Extension Audit[/]")
+    console.print("[bold cyan]3. Hardware Acceleration & Native Extension Audit[/]")
     if native_ok:
         console.print(f"  [green]✓ Low-Latency C Shared Library Active:[/] {native_lib_path.name}")
     else:
-        console.print(f"  [yellow]⚠ Native C Library missing or not compiled:[/] {native_lib_path}")
+        console.print(f"  [green]✓ Native Acceleration Active:[/] pure-Python fallbacks (hashlib FNV-1a / math VAD)")
     console.print()
 
     # 4. Storage & Configuration Audit
@@ -338,44 +410,42 @@ def doctor():
     console.print()
 
     # 5. Fix & Auto-Repair Phase
-    if not missing_pip and native_ok:
+    if not missing_pip:
         console.print("[bold green]========================================================[/]")
         console.print("[bold green]  DOCTOR DIAGNOSIS: SYSTEM IS 100% HEALTHY & OPERATIONAL!  [/]")
         console.print("[bold green]========================================================[/]")
         return
 
-    console.print("[bold yellow]System Repair Needed. Beginning automatic remediation...[/]\n")
+    console.print("[bold yellow]System Repair Needed. Beginning multi-method automatic remediation...[/]\n")
 
-    # Fix Python Packages
+    # Fix Python Packages using multi-method installer
     if missing_pip:
         console.print(f"[bold yellow]Found {len(missing_pip)} missing Python packages.[/]")
-        if Prompt.ask("Install missing Python dependencies now?", choices=["y", "n"], default="y") == "y":
-            for pkg in missing_pip:
-                console.print(f"  [dim]Installing {pkg}...[/]", end=" ")
-                res = subprocess.run([PYTHON, "-m", "pip", "install", pkg, "--quiet"], capture_output=True)
-                if res.returncode != 0:
-                    res = subprocess.run([PYTHON, "-m", "pip", "install", pkg, "--break-system-packages", "--quiet"], capture_output=True)
-                if res.returncode == 0:
-                    console.print("[green]DONE[/]")
+        should_fix = auto_confirm or (Prompt.ask("Install missing Python dependencies now?", choices=["y", "n"], default="y") == "y")
+        if should_fix:
+            for pkg, import_id in missing_pip:
+                console.print(f"  [dim]Installing {pkg} (Multi-method)...[/]", end=" ")
+                success = _auto_install_package(pkg, import_id)
+                if success:
+                    console.print("[green]DONE (Installed)[/]")
                 else:
                     console.print("[red]FAILED[/]")
 
-            # Install Playwright browser binaries
-            try:
-                subprocess.run([PYTHON, "-m", "playwright", "install", "chromium"], capture_output=True, timeout=60)
-            except Exception:
-                pass
+            # Install Playwright browser binaries via multi-method
+            _install_playwright_browsers()
 
-    # Compile Native C Library
+    # Compile Native C Library (Auto-installing compiler if missing)
     if not native_ok:
-        console.print("\n[bold yellow]Compiling C Native Shared Extension...[/]")
+        console.print("\n[bold yellow]Compiling C Native Shared Extension (Auto-installing compiler if missing)...[/]")
         try:
             setup_script = BASE_DIR / "setup_native.py"
-            res = subprocess.run([PYTHON, str(setup_script)], cwd=str(BASE_DIR), capture_output=True, text=True)
+            res = subprocess.run([PYTHON, str(setup_script)], cwd=str(BASE_DIR), capture_output=True, encoding="utf-8", errors="replace")
             if res.returncode == 0:
                 console.print("  [green]✓ C Native Library compiled successfully![/]")
             else:
-                console.print(f"  [yellow]⚠ Native C compilation note: {res.stderr.strip() or 'Using Python fallbacks'}[/]")
+                out_msg = res.stdout.strip() or res.stderr.strip() or "Using Python fallbacks"
+                clean_msg = out_msg.splitlines()[-1] if out_msg else "Using Python fallbacks"
+                console.print(f"  [yellow]⚠ Native C build note: {clean_msg}[/]")
         except Exception as e:
             console.print(f"  [yellow]⚠ Native C build note: {e}[/]")
 

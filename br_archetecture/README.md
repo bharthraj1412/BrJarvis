@@ -9,9 +9,11 @@ Welcome to the **BR JARVIS (Project BR)** Engineering Knowledge Base. This direc
 ```
 br_archetecture/
 ├── README.md                          # Root Knowledge Base index (This file)
+├── fullproject.md                     # Master Full Project Documentation & Architecture
 ├── PROJECT_VISION.md                  # Project BR vision, philosophy & objectives
 ├── ROADMAP.md                         # Multi-phase development roadmap
 ├── CHANGELOG.md                       # Architectural implementation log
+├── full_repository_audit.md           # Deep CTO engineering audit report
 ├── architecture/
 │   ├── ARCHITECTURE.md                # System topology, data flow & component graph
 │   └── PROJECT_STRUCTURE.md            # Codebase directory mapping & responsibilities
@@ -39,7 +41,8 @@ br_archetecture/
 
 ## 🌟 Essential Reading Order for AI Agents & Developers
 
-1. [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) — Core system topology & data flow
+1. [fullproject.md](fullproject.md) — Master Full Project Information & Architectural Guide
+2. [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) — Core system topology & data flow
 2. [PROJECT_VISION.md](PROJECT_VISION.md) — Project BR identity & long-term goals
 3. [ROADMAP.md](ROADMAP.md) — System phase execution roadmap
 4. [ai/CONTEXT_ENGINE.md](ai/CONTEXT_ENGINE.md) — Token accounting & context assembly
