@@ -16,17 +16,17 @@ _MODELS_JSON = _CONFIG_DIR / "models.json"
 _DEFAULTS = {
     "voice_live":       "models/gemini-3.1-flash-live-preview",
     "voice_name":       "Charon",
-    "gemini":           "gemini-3.5-flash",
+    "gemini":           "gemini-3-flash",
     "claude":           "claude-3-7-sonnet",
     "gpt":              "gpt-4o-2024-11-20",
     "ollama":           "llama3.3",
     "nvidia":           "meta/llama-3.1-70b-instruct",
     "mistral":          "mistral-large-latest",
     "default_backend":  "gemini",
-    "planner_model":    "gemini-3.1-pro",
-    "fast_model":       "gemini-3.5-flash",
-    "openai_base_url":  "",
-    "openai_model":     "",
+    "planner_model":    "gemini-3-flash",
+    "fast_model":       "gemini-3.5-flash-low",
+    "openai_base_url":  "http://localhost:8045/v1",
+    "openai_model":     "gemini-3-flash",
 }
 
 _ENV_MAP = {
