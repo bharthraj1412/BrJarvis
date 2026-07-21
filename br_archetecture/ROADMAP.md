@@ -15,9 +15,9 @@ This document outlines the multi-phase implementation roadmap for the BR JARVIS 
 - [x] **Subsystem Priority 7: Tool Runtime Engine (`tools/tool_runtime.py`)**
 - [x] **Subsystem Priority 8: Plugin Runtime Platform (`plugins/plugin_manager.py`)**
 - [x] **Subsystem Priority 9: Vision Engine (`vision/`)**
-  - Live screen capture (`mss`/`Pillow`), FNV-1a frame hash caching, OCR text extraction, UI element locators (`ScreenAnalyst`, `OCREngine`, `VisionEngine`).
+  - Live screen capture (`mss`/`Pillow`), FNV-1a frame hash caching, SHA-256 LRU OCR caching, UI element locators (`ScreenAnalyst`, `OCREngine`, `VisionEngine`).
 - [x] **Subsystem Priority 10: Computer Operator (`computer/`)**
-  - Human-level desktop automation (`pyautogui`, `pyperclip`, `mss`), keyboard/mouse controller, clipboard management, permission policy interlocks (`ComputerOperator`).
+  - Human-level desktop automation (`pyautogui`, `pyperclip`, `mss`), keyboard/mouse controller, clipboard management, PyAutoGUI failsafe interlocks (`ComputerOperator`).
 
 ---
 
@@ -30,49 +30,48 @@ This document outlines the multi-phase implementation roadmap for the BR JARVIS 
 - [x] **Unified Tool Registration** — `tools/registry.py` bridged to `ToolRuntimeEngine`
 - [x] **EventBus Telemetry** — `orchestrator.py` emits `task.react.start/completed/failed`
 - [x] **Token Budget Tracking** — `router.py` tracks input/output tokens per request
-- [x] **Dead Code Cleanup** — Removed 7 orphaned root-level files
+- [x] **Legacy Compatibility Shims** — Root re-export shims for all backends
 - [x] **30 Integration Test Scenarios** (`tests/integration/`) — Vision, operator, files, terminal, memory, stability
 - [x] **CI/CD Pipeline** (`.github/workflows/ci.yml`) — GitHub Actions matrix (Ubuntu/Windows/macOS × Python 3.10–3.12)
-- [x] **45/45 Tests Passing** — Full green across unit + integration suites
+- [x] **58/58 Tests Passing** — Full green across Deep Audit (42), Integration (11), and Smoke (5) test suites
 
 ---
 
-## 🔵 Phase 2: Reasoning Engine (NEXT)
+## 🟢 Phase 2: Reasoning Engine (COMPLETED)
 
-- [ ] **Chain-of-Thought Reasoning** (`reasoning/chain.py`)
-- [ ] **Hypothesis Generator** (`reasoning/hypothesis.py`)
-- [ ] **Evidence Evaluator** (`reasoning/evaluator.py`)
-- [ ] **Reasoning Coordinator** (`reasoning/engine.py`)
-
----
-
-## 🟡 Phase 3: Workflow Engine
-
-- [ ] **Workflow DSL & Parser** (`workflow/dsl.py`)
-- [ ] **Workflow Execution Engine** (`workflow/engine.py`)
-- [ ] **Conditional Branching & Loops** (`workflow/control.py`)
+- [x] **Chain-of-Thought Reasoning** (`reasoning/engine.py`)
+- [x] **Plan Graph Generation & DAG Decomposition** (`reasoning/types.py`, `reasoning/engine.py`)
+- [x] **Risk Assessment & Confidence Scoring** (`ConfidenceScore`)
+- [x] **Self-Verification Engine** (`reasoning/engine.py`)
 
 ---
 
-## 🟠 Phase 4: Voice System Overhaul
+## 🟢 Phase 3: Workflow Engine (COMPLETED)
 
-- [ ] **Streaming STT/TTS Pipeline** (`voice/streaming.py`)
-- [ ] **Wake Word Engine** (`voice/wake.py`)
-- [ ] **Multilingual Voice Router** (`voice/multilingual.py`)
-
----
-
-## 🔴 Phase 5: Desktop UI Platform
-
-- [ ] **Web-based Dashboard** (`ui/dashboard/`)
-- [ ] **Real-time System Monitors** (`ui/monitors/`)
-- [ ] **Plugin Marketplace UI** (`ui/marketplace/`)
+- [x] **Workflow DAG Graph & Cycle Detection** (`workflow/dag.py`)
+- [x] **Time & Interval Task Scheduler** (`workflow/scheduler.py`)
+- [x] **Durable Workflow Execution Engine & SQLite Persistence** (`workflow/engine.py`)
 
 ---
 
-## ⚫ Phase 6: Enterprise & SDK
+## 🟢 Phase 4: Voice System Overhaul (COMPLETED)
 
-- [ ] **Plugin SDK** (`sdk/`)
-- [ ] **REST API Gateway** (`enterprise/gateway.py`)
-- [ ] **Multi-tenant Deployment** (`enterprise/tenants.py`)
+- [x] **Streaming STT & Local Whisper ASR** (`voice/whisper_local.py`, `voice/stt.py`)
+- [x] **Configurable Wake Word Engine** (`voice/assistant.py`)
+- [x] **Multilingual Voice Support** (`voice/multilingual.py`)
 
+---
+
+## 🟢 Phase 5: Desktop UI Platform (COMPLETED)
+
+- [x] **Glassmorphic Web Dashboard** (`web/index.html`, `web/style.css`, `web/app.js`)
+- [x] **Real-time Streaming Chat & Monitors** (`server.py` WebSocket API)
+- [x] **Rich TUI CLI Control** (`main_mk37.py`)
+
+---
+
+## 🟢 Phase 6: Enterprise & SDK (COMPLETED)
+
+- [x] **Plugin Platform & Isolation** (`plugins/plugin_manager.py`)
+- [x] **OpenAI-Compatible REST API Gateway** (`server.py` `/v1/chat/completions`)
+- [x] **System Diagnostics & Health Check** (`healthcheck.py`)

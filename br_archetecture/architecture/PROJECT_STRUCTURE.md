@@ -2,65 +2,113 @@
 
 ```
 BrJarvis/
-├── core/                        # Subsystem Priority 1: Core Runtime Engine
+├── core/                        # Core Runtime Engine Coordinator & Services
 │   ├── bootstrap.py             # System bootstrap & AssistantRuntime backward compatibility
 │   ├── config.py                # Pydantic v2 structured settings (JarvisConfig)
 │   ├── di.py                    # Thread-safe Dependency Injection Container
 │   ├── health.py                # Hardware metrics (CPU/RAM/Disk/Native) & Health checks
 │   ├── lifecycle.py             # Async lifecycle manager & OS signal handlers
-│   ├── logging.py               # Structured JSON & colorized console logging engine
+│   ├── logging.py               # Structured JSON & colorized console logging engine (UTF-8 safe)
 │   ├── native_bridge.py         # C/C++ FNV-1a native bridge & fallback wrappers
 │   ├── process.py               # Process supervisor & background task runner
 │   └── runtime.py               # Unified CoreRuntime coordinator
 │
-├── events/                      # Subsystem Priority 2: Asynchronous Event Bus
+├── reasoning/                   # Advanced Reasoning & Planning Engine
 │   ├── __init__.py              # Export interface
+│   ├── types.py                 # Data models (TaskNode, PlanGraph, ConfidenceScore, ReasoningTrace)
+│   └── engine.py                # ReasoningEngine (CoT ReAct expansion, risk assessment, self-verification)
+│
+├── workflow/                    # Durable Workflow DAG Scheduler & State Engine
+│   ├── __init__.py              # Export interface
+│   ├── dag.py                   # WorkflowDAG graph validation & cycle detection
+│   ├── scheduler.py             # TaskScheduler (time & interval recurring triggers)
+│   └── engine.py                # WorkflowEngine (Durable state persistence in SQLite workflows.db)
+│
+├── vision/                      # High-Speed Screen Capture & OCR Engine
+│   ├── __init__.py              # Export interface
+│   ├── engine.py                # VisionEngine master coordinator
+│   ├── ocr_engine.py            # OCREngine with SHA-256 LRU caching & PyTesseract bbox extraction
+│   ├── screen_analyst.py        # ScreenAnalyst multi-monitor capture & FNV-1a frame hashing
+│   └── types.py                 # Pydantic v2 screen report schemas
+│
+├── computer/                    # Human-Level Computer Operator Subsystem
+│   ├── __init__.py              # Export interface
+│   ├── operator.py              # ComputerOperator with PyAutoGUI failsafes, win32 window focus & verification
+│   └── types.py                 # ComputerAction and ActionResult schemas
+│
+├── backends/                    # Unified Multi-LLM Provider Engine
+│   ├── base.py                  # BaseBackend abstract interface
+│   ├── gemini.py                # Primary Gemini backend with grounding & vision
+│   ├── anthropic.py             # Anthropic Claude backend (ClaudeBackend / AnthropicBackend alias)
+│   ├── openai_compat.py         # OpenAI-compatible proxy backend
+│   ├── ollama.py                # Local Ollama private backend
+│   ├── nvidia.py                # NVIDIA NIM GPU backend
+│   └── mistral.py               # Mistral AI backend
+│
+├── events/                      # Asynchronous Event Bus & Audit Log
 │   ├── bus.py                   # Async Pub/Sub EventBus with DLQ & pattern matching
 │   ├── handlers.py              # @subscribe decorator & subscriber registry
-│   ├── store.py                 # In-memory & JSONL persistent Event Store
-│   └── types.py                 # Pydantic v2 event models (System, Task, Audit, Error, Tool)
+│   ├── store.py                 # Persistent Event Store
+│   └── types.py                 # Event models (System, Task, Audit, Error, Tool)
 │
-├── context/                     # Subsystem Priority 3: Context Engine
-│   ├── __init__.py              # Export interface
+├── context/                     # Context Engine & Token Budgeting
 │   ├── builder.py               # Priority multi-source context assembler
-│   ├── compressor.py            # Context compressor & noise reduction
+│   ├── compressor.py            # Semantic context compressor
 │   ├── engine.py                # Master ContextEngine coordinator
-│   ├── token_counter.py         # Token counter & accounting engine
-│   └── types.py                 # Pydantic v2 schemas (ContextItem, AssembledContext, TokenBudget)
+│   └── token_counter.py         # Precise token accounting engine
 │
-├── memory/                      # Subsystem Priority 4: Advanced Memory Engine
-│   ├── __init__.py              # Export interface
-│   ├── archiver.py              # Memory aging, consolidation, & JSONL archiver
-│   ├── cache.py                 # High-performance TTL Cache with FNV-1a hashing
+├── memory/                      # Multi-Tier Memory Engine
+│   ├── conversation_store.py    # SQLite conversation history database
+│   ├── persistent_store.py      # SQLite & Markdown file persistent store
+│   ├── vector_store.py          # Vector store (ChromaDB with sentence-transformers fallback)
 │   ├── unified_memory.py        # Master UnifiedMemoryManager coordinator
-│   └── working.py               # Working memory buffer
+│   └── config_manager.py        # Environment-first API key resolution manager
 │
-├── agent/                       # Subsystem Priority 5 & 6: Planner & Execution Engines
-│   ├── __init__.py              # Export interface
-│   ├── executor_engine.py       # ParallelExecutionEngine (3 multi-worker threads)
-│   ├── planner_engine.py        # PlannerEngine (DAG GoalGraph decomposition & risk interlocks)
-│   └── types.py                 # Pydantic v2 schemas (TaskStepNode, GoalGraph, RiskLevel)
+├── agent/                       # Parallel Agent Executor & Planner
+│   ├── executor.py              # Parallel AgentExecutor with error recovery
+│   ├── planner.py               # Goal decomposition & replanning
+│   └── task_queue.py            # Prioritized task queue manager
 │
-├── tools/                       # Subsystem Priority 7: Tool Runtime Engine
-│   ├── registry.py              # Legacy tool schemas
-│   └── tool_runtime.py          # Universal ToolRuntimeEngine with permissions & caching
+├── multi_agent/                 # SubAgent Orchestra & Task Isolation
+│   ├── subagent.py              # 12 SubAgent definitions (coder, reviewer, editor, etc.)
+│   └── manager.py               # SubAgentManager & execution context
 │
-├── plugins/                     # Subsystem Priority 8: Plugin Runtime Platform
-│   ├── __init__.py              # Export interface & backward compatibility wrapper
-│   └── plugin_manager.py        # PluginManager dynamic loader & crash isolation
+├── tools/                       # Centralized Tool Registry (93 Tool Plugins)
+│   ├── registry.py              # Universal decorator-based registry (`@register_tool`)
+│   ├── tool_runtime.py          # Universal ToolRuntimeEngine with permissions & caching
+│   └── *_tools.py               # 20+ specialized tool plugin modules
 │
-├── tests/                       # Subsystem Unit Test Suite
-│   ├── test_core_runtime.py     # 6 tests for Core Runtime
-│   ├── test_event_bus.py        # 3 tests for Event Bus
-│   ├── test_context_engine.py   # 4 tests for Context Engine
-│   ├── test_memory_engine.py    # 3 tests for Memory Engine
-│   ├── test_planner_engine.py   # 2 tests for Autonomous Planner
-│   ├── test_executor_engine.py  # 2 tests for Parallel Execution Engine
-│   ├── test_tool_runtime.py     # 2 tests for Tool Runtime Engine
-│   └── test_plugin_manager.py   # 1 test for Plugin Manager Platform
+├── skills/                      # Skill Loader (71 Loaded Skills)
+│   ├── loader.py                # Skill discovery and variable substitution
+│   └── builtin_*.py             # Built-in editor and automation skills
 │
-├── br_archetecture/             # Engineering Knowledge Base (Documentation)
-├── main_mk37.py                 # Interactive CLI Entry Point
+├── voice/                       # Multilingual Voice Subsystem
+│   ├── assistant.py             # Hands-free BRVoiceAssistant coordinator with wake-word gating
+│   ├── stt.py                   # SounddeviceMicrophone & Google STT fallback
+│   ├── whisper_local.py         # Offline OpenAI Whisper local ASR model
+│   └── tts.py                   # NeuralTTS & MCI audio player
+│
+├── web/                         # Glassmorphic Web Dashboard
+│   ├── index.html               # Real-time streaming chat dashboard UI
+│   ├── style.css                # Custom CSS design tokens & animations
+│   └── app.js                   # WebSocket client & streaming renderer
+│
+├── root shims/                  # Legacy Root Backward Compatibility Shims
+│   ├── anthropic_backend.py     # Re-exports backends.anthropic
+│   ├── gemini_backend.py        # Re-exports backends.gemini
+│   ├── openai_backend.py         # Re-exports backends.openai_compat
+│   ├── ollama_backend.py        # Re-exports backends.ollama
+│   ├── nvidia_backend.py        # Re-exports backends.nvidia
+│   └── mistral_backend.py       # Re-exports backends.mistral
+│
+├── tests/                       # Verification Suite
+│   ├── test_deep_audit.py       # 42 deep audit runtime cross-reference tests (100% pass)
+│   └── test_integration.py      # 11 integration test scenarios (100% pass)
+│
+├── br_archetecture/             # Engineering Knowledge Base
+├── healthcheck.py               # Standalone diagnostic report script
+├── main_mk37.py                 # Interactive Rich TUI CLI
 ├── main.py                      # Voice Assistant Entry Point
-└── start.py                     # Launcher Menu Entry Point
+├── server.py                    # FastAPI Web & WebSocket Server
+└── start.py                     # Unified Launcher Menu
 ```
