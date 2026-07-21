@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from core.native_bridge import fast_hash
 
 logger = logging.getLogger("JARVIS.ScreenAnalyst")
@@ -21,21 +21,47 @@ except ImportError:
 
 
 class ScreenAnalyst:
-    """High-speed screen capture analyst with FNV-1a unchanged frame hashing."""
+    """High-speed screen capture analyst with FNV-1a unchanged frame hashing and multi-monitor support."""
 
-    def __init__(self):
+    def __init__(self, default_monitor: int = 1):
+        self.default_monitor = default_monitor
         self._last_frame_hash: int = 0
 
-    def capture_frame(self) -> Tuple[bytes, int, int, int]:
-        """Capture current screen frame. Returns (raw_bytes, width, height, frame_hash)."""
+    def get_monitors(self) -> List[Dict[str, int]]:
+        """List available monitors and their dimensions."""
+        if _MSS_AVAILABLE:
+            try:
+                with mss() as sct:
+                    return [
+                        {
+                            "id": idx,
+                            "top": m["top"],
+                            "left": m["left"],
+                            "width": m["width"],
+                            "height": m["height"],
+                        }
+                        for idx, m in enumerate(sct.monitors)
+                    ]
+            except Exception as e:
+                logger.debug(f"Failed to enumerate monitors with mss: {e}")
+        return [{"id": 1, "top": 0, "left": 0, "width": 1920, "height": 1080}]
+
+    def capture_frame(self, monitor_idx: Optional[int] = None) -> Tuple[bytes, int, int, int]:
+        """Capture current screen frame from specified or default monitor. Returns (raw_bytes, width, height, frame_hash)."""
+        idx = monitor_idx if monitor_idx is not None else self.default_monitor
         width, height = 1920, 1080
         raw_bytes = b""
 
         if _MSS_AVAILABLE:
             try:
                 with mss() as sct:
-                    monitor = sct.monitors[1]  # Primary monitor
-                    sct_img = sct.grab(monitor)
+                    monitors = sct.monitors
+                    if 0 <= idx < len(monitors):
+                        mon = monitors[idx]
+                    else:
+                        mon = monitors[1] if len(monitors) > 1 else monitors[0]
+                    
+                    sct_img = sct.grab(mon)
                     width, height = sct_img.width, sct_img.height
                     raw_bytes = bytes(sct_img.raw)
             except Exception as e:
@@ -59,3 +85,7 @@ class ScreenAnalyst:
             return True
         self._last_frame_hash = frame_hash
         return False
+
+    def reset_hash(self) -> None:
+        """Reset internal frame hash memory."""
+        self._last_frame_hash = 0

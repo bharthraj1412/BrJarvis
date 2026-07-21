@@ -16,6 +16,7 @@ class ClaudeBackend(BaseBackend):
     """Anthropic Claude backend with proper message format conversion."""
 
     def __init__(self, model: str = None, api_key: str = None):
+
         try:
             from config.models import get_model
             default_model = get_model("claude") or "claude-sonnet-4-20250514"
@@ -102,3 +103,8 @@ class ClaudeBackend(BaseBackend):
                     yield text
         except Exception as e:
             yield f"\n[Claude Stream Error: {e}]"
+
+
+# Alias for legacy compatibility
+AnthropicBackend = ClaudeBackend
+

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
+import sys
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from computer.types import ActionResult, ActionType, ComputerAction
 from core.runtime import get_runtime
 from events.bus import get_event_bus
@@ -16,7 +18,8 @@ logger = logging.getLogger("JARVIS.ComputerOperator")
 
 try:
     import pyautogui
-    pyautogui.FAILSAFE = False
+    # Enforce PyAutoGUI Fail-Safe security: moving mouse to corner aborts automation
+    pyautogui.FAILSAFE = True
     _PYAUTOGUI_AVAILABLE = True
 except ImportError:
     _PYAUTOGUI_AVAILABLE = False
@@ -38,7 +41,7 @@ class ComputerOperator:
 
         # Register self in DI container
         self.runtime.container.register_instance(ComputerOperator, self)
-        logger.info("⚡ ComputerOperator initialized")
+        logger.info("⚡ ComputerOperator initialized (Failsafe ACTIVE)")
 
     def execute_action(self, action: ComputerAction) -> ActionResult:
         """Execute a desktop OS action with permission policy validation and verification."""
@@ -71,6 +74,14 @@ class ComputerOperator:
                 clip_text = pyperclip.paste() if _PYPERCLIP_AVAILABLE else ""
                 return ActionResult(action_id=action.action_id, success=True, data=clip_text)
 
+            elif action.action_type == ActionType.WINDOW_FOCUS:
+                success = self.focus_window(action.text or "")
+                return ActionResult(
+                    action_id=action.action_id,
+                    success=success,
+                    verification_message=f"Focus window '{action.text}' result: {success}",
+                )
+
             # Audit event
             self.event_bus.publish(AuditEvent(
                 topic="audit.action",
@@ -88,6 +99,75 @@ class ComputerOperator:
         except Exception as e:
             logger.error(f"❌ ComputerOperator action failed: {e}", exc_info=True)
             return ActionResult(action_id=action.action_id, success=False, verification_message=str(e))
+
+    async def async_execute_action(self, action: ComputerAction) -> ActionResult:
+        """Asynchronous execution wrapper for computer action."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.execute_action, action)
+
+    def focus_window(self, title_query: str) -> bool:
+        """Attempt to focus a window matching title substring."""
+        if not title_query:
+            return False
+
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                
+                # Find matching window handle
+                found_hwnd = None
+                
+                def enum_windows_callback(hwnd, extra):
+                    nonlocal found_hwnd
+                    if user32.IsWindowVisible(hwnd):
+                        length = user32.GetWindowTextLengthW(hwnd)
+                        if length > 0:
+                            buff = ctypes.create_unicode_buffer(length + 1)
+                            user32.GetWindowTextW(hwnd, buff, length + 1)
+                            if title_query.lower() in buff.value.lower():
+                                found_hwnd = hwnd
+                                return False
+                    return True
+
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
+
+                if found_hwnd:
+                    user32.SetForegroundWindow(found_hwnd)
+                    return True
+            except Exception as e:
+                logger.debug(f"win32 window focus failed: {e}")
+
+        return False
+
+    def click(self, x: int, y: int, description: str = "") -> ActionResult:
+        """Convenience method to click screen coordinates."""
+        action = ComputerAction(
+            action_type=ActionType.MOUSE_CLICK,
+            x=x,
+            y=y,
+            description=description or f"Click at ({x}, {y})",
+        )
+        return self.execute_action(action)
+
+    def type_text(self, text: str, description: str = "") -> ActionResult:
+        """Convenience method to type text."""
+        action = ComputerAction(
+            action_type=ActionType.KEYBOARD_TYPE,
+            text=text,
+            description=description or f"Type '{text[:20]}'",
+        )
+        return self.execute_action(action)
+
+    def hotkey(self, keys: List[str], description: str = "") -> ActionResult:
+        """Convenience method to press a hotkey combination."""
+        action = ComputerAction(
+            action_type=ActionType.HOTKEY,
+            keys=keys,
+            description=description or f"Hotkey {'+'.join(keys)}",
+        )
+        return self.execute_action(action)
 
 
 _global_computer_operator: Optional[ComputerOperator] = None

@@ -63,10 +63,15 @@ def _save_config_key(key: str, value) -> None:
 
 
 def _get_api_key() -> str:
+    for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = os.environ.get(env, "").strip()
+        if val:
+            return val
     key = _load_config().get("gemini_api_key", "")
     if not key:
-        raise RuntimeError("gemini_api_key not found in config.")
+        raise RuntimeError("GEMINI_API_KEY / GOOGLE_API_KEY not found in env or config.")
     return key
+
 
 
 def _get_os() -> str:

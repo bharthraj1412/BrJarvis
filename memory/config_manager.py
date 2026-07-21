@@ -44,8 +44,13 @@ def load_api_keys() -> dict:
         return {}
 
 def get_gemini_key() -> str | None:
+    import os
+    for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = os.environ.get(env, "").strip()
+        if val:
+            return val
     return load_api_keys().get("gemini_api_key")
 
 def is_configured() -> bool:
     key = get_gemini_key()
-    return bool(key and len(key) > 15)
+    return bool(key and len(key) > 5)

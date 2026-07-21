@@ -67,7 +67,12 @@ def _load_config() -> dict:
 
 
 def _get_api_key() -> str:
+    for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = os.environ.get(env, "").strip()
+        if val:
+            return val
     return _load_config().get("gemini_api_key", "")
+
 
 
 # ── Screen resolution ─────────────────────────────────────────────────────────

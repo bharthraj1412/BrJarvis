@@ -44,13 +44,18 @@ def _base_dir() -> Path:
 
 
 def _get_api_key() -> str:
+    for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = os.environ.get(env, "").strip()
+        if val:
+            return val
     try:
         cfg_path = _base_dir() / "config" / "api_keys.json"
         if cfg_path.exists():
-            return json.loads(cfg_path.read_text(encoding="utf-8")).get("gemini_api_key", "")
+            return json.loads(cfg_path.read_text(encoding="utf-8")).get("gemini_api_key", "").strip()
     except Exception:
         pass
-    return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
+    return ""
+
 
 
 class LiveOSController:

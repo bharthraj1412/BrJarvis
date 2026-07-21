@@ -4,6 +4,43 @@ All major architectural updates, subsystem additions, and core refactorings are 
 
 ---
 
+## [37.4.0] — 2026-07-21
+
+### Added & Upgraded
+- **Reasoning Engine Subsystem (`reasoning/`)**:
+  - Implemented `reasoning/types.py` data models (`TaskNode`, `PlanGraph`, `ConfidenceScore`, `ReasoningTrace`).
+  - Implemented `reasoning/engine.py` master `ReasoningEngine` with Chain-of-Thought (CoT) ReAct expansion, risk confidence scoring, and self-verification trace checks.
+
+- **Workflow Engine Subsystem (`workflow/`)**:
+  - Implemented `workflow/dag.py` `WorkflowDAG` graph with dependency tracking and cycle detection.
+  - Implemented `workflow/scheduler.py` background `TaskScheduler` supporting time/interval triggers.
+  - Implemented `workflow/engine.py` durable `WorkflowEngine` managing state transitions (`PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `FAILED`) with SQLite state persistence (`workflows.db`).
+
+- **Vision Engine Subsystem Upgrades (`vision/`)**:
+  - Upgraded `vision/ocr_engine.py` with LRU caching, SHA-256 frame hash check, and PyTesseract bounding box extractions with clean fallback.
+  - Upgraded `vision/screen_analyst.py` with multi-monitor selection (`get_monitors()`) and FNV-1a frame hashing.
+  - Upgraded `vision/engine.py` with multi-monitor analysis and `vision.screen.analyzed` event publishing.
+
+- **Computer Operator Subsystem Upgrades (`computer/`)**:
+  - Upgraded `computer/operator.py` with PyAutoGUI mouse-corner security failsafes (`pyautogui.FAILSAFE = True`), async execution wrapper (`async_execute_action`), native win32 window focus matching, and action verification.
+
+- **Voice Engine & Router Upgrades (`voice/`, `router.py`)**:
+  - Upgraded `voice/stt.py` & `voice/whisper_local.py` for offline speech recognition.
+  - Upgraded `voice/assistant.py` with wake-word gating and vocabulary correction.
+  - Upgraded `router.py` adaptive complexity routing and token budgeting.
+
+- **Backward Compatibility & Logging Resilience**:
+  - Re-created 6 root backend compatibility shims (`anthropic_backend.py`, `gemini_backend.py`, `openai_backend.py`, `ollama_backend.py`, `nvidia_backend.py`, `mistral_backend.py`).
+  - Fixed Windows standard stream logging encoding (`cp1252` `UnicodeEncodeError`) in `core/logging.py`.
+  - Audited `actions/` modules to check `os.environ` (`GEMINI_API_KEY` / `GOOGLE_API_KEY`) before reading JSON configuration files.
+
+- **Verification Results**:
+  - 42/42 Deep Audit tests passing (`python test_deep_audit.py`).
+  - 11/11 Integration tests passing (`python test_integration.py`).
+  - 5/5 Startup Smoke checks passing (`python scripts/smoke_startup.py`).
+
+---
+
 ## [37.3.0] — 2026-07-20
 
 ### Added
@@ -56,14 +93,3 @@ All major architectural updates, subsystem additions, and core refactorings are 
 - **Subsystem 10: Computer Operator (`computer/`)**
   - Implemented `computer/types.py` Pydantic v2 action schemas.
   - Implemented `computer/operator.py` desktop automation controller with permissions checking and interlocks.
-
-- **Phase 1: Integration & Validation**
-  - Implemented `core/integration.py` integration bridge between legacy and new core subsystems.
-  - Implemented `core/retry.py` sync/async exponential backoff retry decorator.
-  - Implemented `core/timeouts.py` parameterized timeout configurations.
-  - Implemented `core/error_middleware.py` global exception tracking and emergency interlock system.
-  - Unified tool registration inside `tools/registry.py` with `ToolRuntimeEngine`.
-  - Removed 7 dead/legacy root files (`anthropic_backend.py`, `gemini_backend.py`, `mistral_backend.py`, `nvidia_backend.py`, `ollama_backend.py`, `openai_backend.py`, `scratch.py`).
-  - Implemented 30 integration test scenarios in `tests/integration/` (Vision, Operator, Files, Terminal, Git, Memory, Stability).
-  - Created `.github/workflows/ci.yml` multi-platform test pipeline matrix (Ubuntu/Windows/macOS × Python 3.10–3.12).
-  - Increased total test coverage to **45/45 tests passing 100% green**.

@@ -14,6 +14,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
+# Ensure UTF-8 output on Windows consoles
+if sys.platform == "win32":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 # Context Var for Correlation IDs across async tasks
 correlation_id_ctx: ContextVar[str] = ContextVar("correlation_id", default="sys-init")
 

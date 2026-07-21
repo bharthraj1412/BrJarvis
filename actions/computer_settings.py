@@ -29,23 +29,20 @@ def _get_base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 def _get_api_key() -> str:
+    import os
     for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
-        val = platform.os.environ.get(env, "").strip() if hasattr(platform, "os") else ""
+        val = os.environ.get(env, "").strip()
         if val:
             return val
     try:
-        import os
-        for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
-            val = os.environ.get(env, "").strip()
-            if val:
-                return val
         path = _get_base_dir() / "config" / "api_keys.json"
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
-            return data.get("gemini_api_key", "")
+            return data.get("gemini_api_key", "").strip()
     except Exception:
         pass
     return ""
+
 
 def _get_macos_wifi_interface() -> str:
     try:

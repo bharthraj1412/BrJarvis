@@ -63,8 +63,19 @@ _YT_VIDEO_FILTER = "EgIQAQ%3D%3D"
 
 
 def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+    import os
+    for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        val = os.environ.get(env, "").strip()
+        if val:
+            return val
+    try:
+        if API_CONFIG_PATH.exists():
+            with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f).get("gemini_api_key", "").strip()
+    except Exception:
+        pass
+    return ""
+
 
 
 def _is_windows() -> bool:
