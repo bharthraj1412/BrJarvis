@@ -201,6 +201,10 @@ class JarvisOrchestrator:
         except Exception:
             pass
 
+    def _store_exchange(self, user_input: str, response: str) -> None:
+        """Alias for _save_turn to ensure backwards compatibility."""
+        self._save_turn(user_input, response)
+
     def _record_turn(self, role: str, content: str, **kwargs) -> None:
         if self._session_store and self._session_id:
             try:
