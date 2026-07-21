@@ -82,8 +82,10 @@ class DeterministicIntentEngine:
             except Exception as e:
                 pass
 
-        # 3. Match Excel Codebase Analysis Intent
-        if any(phrase in clean for phrase in ["excel analysis", "analyze project to excel", "create excel report", "project analysis sheet", "full analysis to that sheet"]):
+        # 3. Match Excel Codebase Analysis Intent (Fuzzy/Typo resilient)
+        has_excel = any(w in clean for w in ["excel", "sheet", "workbook", "spreadsheet", "xls"])
+        has_analysis = any(w in clean for w in ["analy", "anali", "project", "poject", "report", "codebase", "summary", "audit"])
+        if has_excel and has_analysis:
             try:
                 from tools.excel_tools import analyze_project_to_excel
                 res_msg = analyze_project_to_excel({})
