@@ -5,7 +5,8 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+
 
 logger = logging.getLogger("JARVIS.TaskScheduler")
 
