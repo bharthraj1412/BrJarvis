@@ -56,3 +56,10 @@ class ToolExecutionEvent(BaseEvent):
     success: Optional[bool] = None
     result: Optional[Any] = None
     duration_ms: Optional[float] = None
+
+
+class VisionEvent(BaseEvent):
+    topic: str = "screen.understood"
+    active_window: Optional[str] = None
+    nodes_count: int = 0
+    verification_success: Optional[bool] = None
