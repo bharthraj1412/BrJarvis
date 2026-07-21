@@ -284,7 +284,13 @@ def analyze_project_to_excel(args: dict) -> str:
                     max_len = len(val_str)
             ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
-    wb.save(out_path)
+    try:
+        wb.save(out_path)
+    except PermissionError:
+        import time
+        ts = time.strftime("%H%M%S")
+        out_path = root_dir / f"JARVIS_Project_Full_Analysis_{ts}.xlsx"
+        wb.save(out_path)
 
     # Auto-open on Windows
     if sys.platform == "win32":
