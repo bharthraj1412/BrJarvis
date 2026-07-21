@@ -196,6 +196,7 @@ def _import_plugins():
         "tools.excel_tools",
         "tools.process_tools",
         "tools.audit_tools",
+        "tools.doc_tools",
     ]
 
     for p in plugins:

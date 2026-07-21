@@ -99,7 +99,24 @@ class DeterministicIntentEngine:
             except Exception as e:
                 pass
 
-        # 4. Match System Diagnostics Intent
+        # 4. Match Product Analysis / Word / PDF Document Generation Intent
+        has_doc_type = any(w in clean for w in ["word", "pdf", "docx", "document", "open it"])
+        has_doc_topic = any(w in clean for w in ["product", "analis", "analys", "analise", "b.r.jarvis", "jarvis"])
+        if (has_doc_type and has_doc_topic) or clean in ("create pdf open it", "open pdf", "product analysis", "create pdf"):
+            try:
+                from tools.doc_tools import generate_project_product_analysis
+                res_msg = generate_project_product_analysis({})
+                return {
+                    "executed": True,
+                    "intent": "document_generation",
+                    "target": "JARVIS_Product_Analysis.docx / .pdf",
+                    "result": res_msg,
+                    "tokens_saved": 4000,
+                }
+            except Exception as e:
+                pass
+
+        # 5. Match System Diagnostics Intent
         if any(phrase in clean for phrase in ["system diagnostics", "top processes", "cpu usage", "ram usage"]):
             try:
                 from tools.process_tools import get_system_diagnostics
