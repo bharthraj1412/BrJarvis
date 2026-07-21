@@ -355,7 +355,12 @@ class BRVoiceAssistant:
                 self.ui.write_log("SYS: Calibrating microphone noise threshold...")
                 try:
                     self.r.adjust_for_ambient_noise(source, duration=self._ambient_calibration)
-                    self.ui.write_log("SYS: Microphone ready. Hands-free mode active.")
+                    time.sleep(0.3)
+                    while not mic.q.empty():
+                        try: mic.q.get_nowait()
+                        except queue.Empty: break
+                    self.ui.set_state("LISTENING")
+                    self.ui.write_log("SYS: Microphone ready. Hands-free mode active. Listening for 'Hey Jarvis'...")
                 except Exception as e:
                     self.ui.write_log(f"ERR: Microphone calibration failed: {e}")
 
