@@ -42,4 +42,6 @@ logs/
 *.spec
 *.xlsx
 *.docx
+*.pdf
+.jarvis.pid
 

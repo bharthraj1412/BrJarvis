@@ -131,7 +131,22 @@ class DeterministicIntentEngine:
             except Exception as e:
                 pass
 
-        # 5. Match Codebase Security Audit Intent
+        # 6. Match Workspace Timeline Intent
+        if any(phrase in clean for phrase in ["workspace timeline", "get timeline", "activity timeline", "recent workspace events"]):
+            try:
+                from tools.workspace_tools import get_workspace_timeline
+                tline_msg = get_workspace_timeline({})
+                return {
+                    "executed": True,
+                    "intent": "workspace_timeline",
+                    "target": "BR_WORKSPACE/Timeline",
+                    "result": tline_msg,
+                    "tokens_saved": 1800,
+                }
+            except Exception as e:
+                pass
+
+        # 7. Match Codebase Security Audit Intent
         if any(phrase in clean for phrase in ["audit codebase", "code security audit", "security audit"]):
             try:
                 from tools.audit_tools import audit_codebase
