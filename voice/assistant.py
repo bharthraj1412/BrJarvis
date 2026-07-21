@@ -274,6 +274,8 @@ class BRVoiceAssistant:
         # Single goal execution using ReAct Orchestrator loop
         try:
             response = await asyncio.to_thread(self.orchestrator.chat, text_clean)
+            if not response or not str(response).strip():
+                response = "I am ready, sir. Please specify a single task or command."
             self.ui.write_log(f"JARVIS: {response}")
             self.speak(response)
         except Exception as e:

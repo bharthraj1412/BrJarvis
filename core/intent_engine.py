@@ -43,10 +43,11 @@ class DeterministicIntentEngine:
         Attempt to deterministically parse and execute the request.
         Returns dict with result details if executed, or None if LLM reasoning is required.
         """
-        if not text or len(text.strip()) > 150:
+        if not text or not text.strip():
             return None
 
         clean = text.lower().strip().rstrip(".!;")
+        lines = [line.strip().lower() for line in text.splitlines() if line.strip()]
 
         # 1. Match App Launch Intent (e.g., "open excel", "launch chrome", "start notepad")
         launch_match = re.search(r"^(?:open|launch|start|run)\s+([a-z0-9_\-\s]+)$", clean)
