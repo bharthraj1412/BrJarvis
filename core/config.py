@@ -14,7 +14,7 @@ MODELS_JSON = CONFIG_DIR / "models.json"
 
 class AssistantConfig(BaseModel):
     name: str = Field(default="BR", description="Name of the assistant")
-    wake_word: str = Field(default="hey", description="Wake word for voice listening")
+    wake_word: str = Field(default="hey jarvis", description="Wake word for voice listening")
     offline_stt: bool = Field(default=False, description="Use offline Whisper model")
     whisper_model: str = Field(default="base", description="Whisper model tier")
     voice_language: str = Field(default="en", description="Primary language code")

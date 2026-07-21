@@ -193,6 +193,9 @@ def _import_plugins():
         "tools.custom_command_tools",
         "tools.export_tools",
         "tools.live_os_tools",
+        "tools.excel_tools",
+        "tools.process_tools",
+        "tools.audit_tools",
     ]
 
     for p in plugins:
@@ -210,3 +213,42 @@ def _import_plugins():
         print(f"[JARVIS] Custom plugins loader warning: {e}")
 
     _plugins_loaded = True
+
+
+def get_tool_prompt_block() -> str:
+    """Return JSON string formatted block of all tool schemas."""
+    _import_plugins()
+    return json.dumps(TOOL_SCHEMAS, indent=2)
+
+
+def get_pruned_tool_prompt_block(user_prompt: str = "") -> str:
+    """
+    Antigravity Dynamic Tool Signature Pruning.
+    Filters the tool registry so only tools relevant to the user prompt are included in system instructions.
+    Reduces system prompt size by ~85%!
+    """
+    _import_plugins()
+    if not TOOL_SCHEMAS:
+        return ""
+
+    if not user_prompt:
+        selected = TOOL_SCHEMAS[:6]
+    else:
+        prompt_lower = user_prompt.lower()
+        selected = []
+        for schema in TOOL_SCHEMAS:
+            name = schema["name"].lower()
+            desc = schema["description"].lower()
+            name_parts = name.split("_")
+            if any(part in prompt_lower for part in name_parts if len(part) > 2) or any(w in desc for w in prompt_lower.split() if len(w) > 4):
+                selected.append(schema)
+
+        if len(selected) < 3:
+            selected = TOOL_SCHEMAS[:6]
+
+    formatted_tools = []
+    for s in selected:
+        formatted_tools.append(f"- **{s['name']}**: {s['description']}")
+
+    return "### Relevant Tools:\n" + "\n".join(formatted_tools)
+

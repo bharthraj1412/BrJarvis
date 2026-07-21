@@ -47,7 +47,7 @@ class BRVoiceAssistant:
         
         # Load configurable settings
         self.name = os.environ.get("JARVIS_ASSISTANT_NAME", "BR").strip()
-        self.wake_word = os.environ.get("JARVIS_WAKE_WORD", "hey").strip().lower()
+        self.wake_word = os.environ.get("JARVIS_WAKE_WORD", "hey jarvis").strip().lower()
         self._wake_listen_timeout = 1.2
         self._wake_phrase_limit = 2.0
         self._command_timeout = 3.0
@@ -101,7 +101,7 @@ class BRVoiceAssistant:
             pass
 
     def _is_wake_phrase(self, text: str) -> bool:
-        """Return True when the transcript contains the wake word, 'jarvis', or configured assistant name."""
+        """Return True when transcript contains 'hey jarvis', the wake word, 'jarvis', or assistant name."""
         normalized = re.sub(r"[^a-z0-9\s]", " ", text.lower()).strip()
         if not normalized:
             return False
@@ -110,10 +110,10 @@ class BRVoiceAssistant:
         wake_word = self.wake_word.lower()
         name = self.name.lower()
         
-        # True if wake word is any of the words
-        if wake_word in words:
+        # True if 'hey jarvis' or configured wake word is in transcript
+        if "hey jarvis" in normalized or wake_word in normalized:
             return True
-        if name in words:
+        if wake_word in words or name in words or name in normalized:
             return True
         if "jarvis" in words or "jarvis" in normalized:
             return True

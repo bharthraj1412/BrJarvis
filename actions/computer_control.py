@@ -570,10 +570,75 @@ def _screen_find(description: str, use_cache: bool = True) -> tuple[int, int] | 
                 print(f"[ComputerControl] ⚡ Cache hit for: {description}")
                 return (cached[0], cached[1])
 
-    try:
-        from google import genai
-        from google.genai import types as gtypes
+def _call_vision_llm(img_bytes: bytes, prompt: str, mime_type: str = "image/png") -> str:
+    """Resilient Vision LLM caller via local gateway or fallback cloud."""
+    import base64
+    import urllib.request
+    import json
 
+    # 1. Try local gateway first (unlimited quota)
+    try:
+        b64_img = base64.b64encode(img_bytes).decode("utf-8")
+        payload = {
+            "model": "gemini-3.1-flash-image",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64_img}"}}
+                    ]
+                }
+            ]
+        }
+        data_bytes = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            "http://localhost:8045/v1/chat/completions",
+            data=data_bytes,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer sk-5ec70bf9fa324084b7a7326babf52c45"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            content = body.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            if content:
+                return content
+    except Exception:
+        pass
+
+    # 2. Fallback to Google GenAI Cloud SDK
+    api_key = _get_api_key()
+    from google import genai
+    from google.genai import types as gtypes
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model="gemini-3.1-flash-image",
+        contents=[
+            gtypes.Part.from_bytes(data=img_bytes, mime_type=mime_type),
+            prompt,
+        ],
+    )
+    return (response.text or "").strip()
+
+
+def screen_find(description: str) -> tuple[int, int] | None:
+    """Find a UI element on screen using Gemini vision."""
+    api_key = _get_api_key()
+    if not api_key:
+        print("[ComputerControl] No API key for screen_find.")
+        return None
+
+    # Check cache
+    with _find_lock:
+        if description in _find_cache:
+            cached = _find_cache[description]
+            if time.time() - cached[2] < 10.0:  # 10s TTL
+                print(f"[ComputerControl] ⚡ Cache hit for: {description}")
+                return (cached[0], cached[1])
+
+    try:
         w, h        = _screen_size()
         img_bytes   = _take_screenshot_bytes()
         if not img_bytes:
@@ -591,8 +656,6 @@ def _screen_find(description: str, use_cache: bool = True) -> tuple[int, int] | 
         else:
             mime_type = "image/png"
 
-        client = genai.Client(api_key=api_key)
-
         prompt = (
             f"This is a screenshot of a {w}×{h} screen. "
             f"Find the UI element described as: '{description}'. "
@@ -600,18 +663,7 @@ def _screen_find(description: str, use_cache: bool = True) -> tuple[int, int] | 
             f"If not visible, reply: NOT_FOUND"
         )
 
-        from config.models import get_model
-        model_name = get_model("fast_model") or "gemini-3.1-flash-lite"
-
-        response = client.models.generate_content(
-            model=model_name,
-            contents=[
-                gtypes.Part.from_bytes(data=img_bytes, mime_type=mime_type),
-                prompt,
-            ],
-        )
-
-        text = (response.text or "").strip()
+        text = _call_vision_llm(img_bytes, prompt, mime_type)
         if "NOT_FOUND" in text.upper():
             return None
 
@@ -634,25 +686,11 @@ def _screen_read(region: tuple | None = None) -> str:
     if not api_key:
         return "No API key for OCR."
     try:
-        from google import genai
-        from google.genai import types as gtypes
-
         img_bytes = _take_screenshot_bytes()
         if not img_bytes:
             return "Could not capture screen."
 
-        client   = genai.Client(api_key=api_key)
-        from config.models import get_model
-        model_name = get_model("fast_model") or "gemini-3.1-flash-lite"
-
-        response = client.models.generate_content(
-            model=model_name,
-            contents=[
-                gtypes.Part.from_bytes(data=img_bytes, mime_type="image/png"),
-                "Read all visible text on the screen. Return a clean, organized transcript.",
-            ],
-        )
-        return (response.text or "").strip()
+        return _call_vision_llm(img_bytes, "Read all visible text on the screen. Return a clean, organized transcript.")
     except Exception as e:
         return f"OCR error: {e}"
 
@@ -663,26 +701,13 @@ def _screen_describe() -> str:
     if not api_key:
         return "No API key for screen describe."
     try:
-        from google import genai
-        from google.genai import types as gtypes
-
         img_bytes = _take_screenshot_bytes()
         if not img_bytes:
             return "Could not capture screen."
 
-        client   = genai.Client(api_key=api_key)
-        from config.models import get_model
-        model_name = get_model("fast_model") or "gemini-3.1-flash-lite"
-
-        response = client.models.generate_content(
-            model=model_name,
-            contents=[
-                gtypes.Part.from_bytes(data=img_bytes, mime_type="image/png"),
-                "Describe what is currently visible on this screen in 2-3 sentences. Be specific about open apps, windows, and content.",
-            ],
-        )
-        return (response.text or "").strip()
+        return _call_vision_llm(img_bytes, "Describe what is currently visible on this screen in 2-3 sentences. Be specific about open apps, windows, and content.")
     except Exception as e:
+        return f"Screen describe error: {e}"
         return f"Screen describe error: {e}"
 
 

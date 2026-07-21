@@ -142,24 +142,21 @@ class JarvisOrchestrator:
             return f"[JARVIS] Unknown mode: '{mode}'. Available: {', '.join(MODES.keys())}"
         return None
 
-    def _build_system(self) -> str:
+    def _build_system(self, user_prompt: str = "") -> str:
         name = os.environ.get("JARVIS_ASSISTANT_NAME", "BR").strip()
-        sys_prompt = SYSTEM_PROMPT.replace("You are BR — a superhuman AI assistant", f"You are {name} — a superhuman AI assistant")
-        sys_prompt = sys_prompt.replace("You are BR", f"You are {name}")
+        sys_prompt = f"You are {name}, an ultra-fast autonomous AI assistant. Think step-by-step, act decisively, avoid filler."
         parts = [sys_prompt]
         mode_text = MODES.get(self.current_mode, "")
         if mode_text:
-            parts.append(f"\n### Active Mode\n{mode_text}")
+            parts.append(f"Mode: {mode_text}")
 
         try:
-            from memory.memory_context import get_memory_context
-            mem = get_memory_context(include_guidance=True)
-            if mem:
-                parts.append(f"\n{mem}")
+            from tools.registry import get_pruned_tool_prompt_block
+            parts.append(get_pruned_tool_prompt_block(user_prompt))
         except Exception:
-            pass
+            from tools.registry import get_tool_prompt_block
+            parts.append(get_tool_prompt_block())
 
-        parts.append(get_tool_prompt_block())
         return "\n".join(parts)
 
     def _extract_keywords(self, text: str) -> list[str]:
@@ -183,18 +180,18 @@ class JarvisOrchestrator:
         if not self.vector_memory:
             return ""
         # Skip trivial inputs (greetings, short phrases)
-        if len(user_input.split()) < 4:
+        if len(user_input.split()) < 3:
             return ""
         try:
-            memories = self.vector_memory.recall(user_input, n=3)
-            if memories:
-                return "[Recalled context]:\n" + "\n---\n".join(memories) + "\n\n"
+            results = self.vector_memory.search(user_input, top_k=2)
+            if results:
+                return "### Relevant Memory\n" + "\n".join(f"- {r}" for r in results)
         except Exception:
             pass
         return ""
 
-    def _store_exchange(self, user_input: str, response: str):
-        if not self.vector_memory:
+    def _save_turn(self, user_input: str, response: str) -> None:
+        if not self.vector_memory or len(response) < 20:
             return
         try:
             self.vector_memory.store(
@@ -263,6 +260,17 @@ class JarvisOrchestrator:
         skill_result = self._check_skill(user_input)
         if skill_result:
             return skill_result
+
+        # Antigravity 0-Token Intent Bypass
+        try:
+            from core.intent_engine import DeterministicIntentEngine
+            from context.token_manager import TokenBudgetManager
+            intent_res = DeterministicIntentEngine.parse_and_execute(user_input)
+            if intent_res and intent_res.get("executed"):
+                TokenBudgetManager().record_usage(consumed=0, saved=intent_res.get("tokens_saved", 2000), is_bypassed=True)
+                return f"⚡ [Antigravity Instant 0-Token Action]\n{intent_res.get('result')}"
+        except Exception:
+            pass
 
         # EventBus Task start telemetry
         import uuid

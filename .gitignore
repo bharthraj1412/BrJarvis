@@ -40,4 +40,6 @@ dist/
 logs/
 .vscode/
 *.spec
+*.xlsx
+*.docx
 
