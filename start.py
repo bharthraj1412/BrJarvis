@@ -645,8 +645,13 @@ def launch_live_os():
     if not goal:
         console.print("[red]No goal specified.[/]")
         return
+    steps_input = Prompt.ask("  [cyan]❯[/] Max Steps [0 = Unlimited ♾️, 50, 100, 500]", default="0")
+    try:
+        max_steps = int(steps_input)
+    except Exception:
+        max_steps = 0
     from actions.live_os_control import live_os_control_action
-    res = live_os_control_action({"goal": goal})
+    res = live_os_control_action({"goal": goal, "max_steps": max_steps})
     console.print(f"\n[bold green]{res}[/]")
 
 

@@ -149,9 +149,13 @@ def _call_vision_llm(img_bytes: bytes, system_instruction: str, api_key: str, mo
 class LiveOSController:
     """Autonomous Live OS Control Loop Engine."""
 
-    def __init__(self, goal: str, max_steps: int = 20, step_delay: float = 0.5):
+    def __init__(self, goal: str, max_steps: int = 50, step_delay: float = 0.5):
         self.goal = goal.strip()
-        self.max_steps = max_steps
+        # 0 or <= 0 indicates Unlimited Mode
+        if max_steps <= 0 or max_steps >= 99999:
+            self.max_steps = 999999
+        else:
+            self.max_steps = max_steps
         self.step_delay = step_delay
         self.history: list[dict] = []
         self._last_img_hash: int | None = None
@@ -172,9 +176,12 @@ class LiveOSController:
         if speak:
             speak(f"Starting live OS control for: {self.goal}")
 
+        limit_str = "Unlimited ♾️" if self.max_steps >= 999999 else f"{self.max_steps} steps"
+
         print(f"\n============================================================")
         print(f" 🤖 JARVIS LIVE OS CONTROL ENGINE (Antigravity Mode)")
         print(f" Goal: {self.goal}")
+        print(f" Step Limit: {limit_str}")
         print(f" Screen Resolution: {screen_w}×{screen_h}")
         print(f" Vision Model: {model_name} (via Gateway / Fallback)")
         print(f"============================================================\n")
@@ -335,6 +342,11 @@ def live_os_control_action(parameters: dict, player=None, speak=None) -> str:
     if not goal:
         return "Please provide a goal for Live OS Control, sir."
 
-    max_steps = int(parameters.get("max_steps", 20))
+    raw_steps = parameters.get("max_steps", 50)
+    try:
+        max_steps = int(raw_steps)
+    except Exception:
+        max_steps = 0 if "unlim" in str(raw_steps).lower() else 50
+
     controller = LiveOSController(goal=goal, max_steps=max_steps)
     return controller.run(player=player, speak=speak)
