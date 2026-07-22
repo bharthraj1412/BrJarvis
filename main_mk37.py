@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import warnings
 warnings.simplefilter("ignore")
+import time
 import os
 import sys
 import signal
@@ -47,7 +48,7 @@ from rich.prompt import Prompt
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from core.bootstrap import build_assistant_runtime
-from router import AgentProfile
+from router import AgentRouter, AgentProfile
 
 console = Console(force_terminal=True)
 
