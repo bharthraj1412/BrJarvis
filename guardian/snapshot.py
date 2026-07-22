@@ -4,6 +4,7 @@ Manages pre-upgrade git commits, database backups, and rolling snapshot retentio
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -41,7 +42,7 @@ class SnapshotManager:
             res = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8", errors="replace",
                 cwd=".",
             )
             if res.returncode == 0:
@@ -60,7 +61,7 @@ class SnapshotManager:
 
         # Save metadata
         (snap_path / "metadata.json").write_text(
-            str(info), encoding="utf-8"
+            json.dumps(info, indent=2), encoding="utf-8"
         )
         cls.prune_old_snapshots(max_count=20)
         return info

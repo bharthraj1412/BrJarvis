@@ -569,7 +569,8 @@ def main():
             import signal
             if sys.platform == "win32":
                 result = subprocess.run(
-                    ["netstat", "-ano"], capture_output=True, text=True, timeout=5
+                    ["netstat", "-ano"], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=5
                 )
                 for line in result.stdout.splitlines():
                     if f":{port}" in line and "LISTENING" in line:

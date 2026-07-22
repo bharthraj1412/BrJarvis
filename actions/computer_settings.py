@@ -1,4 +1,4 @@
-import json
+﻿import json
 import re
 import sys
 import time
@@ -48,7 +48,7 @@ def _get_macos_wifi_interface() -> str:
     try:
         result = subprocess.run(
             ["networksetup", "-listallhardwareports"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, encoding=" utf-8\, errors=\replace\, timeout=5
         )
         lines = result.stdout.splitlines()
         for i, line in enumerate(lines):
@@ -177,7 +177,7 @@ def _win_brightness_change(delta: int):
              f"$m = Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightnessMethods;"
              f"$m | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{{Timeout=1; Brightness=$new}};"
              f"Write-Output $new"],
-            capture_output=True, text=True, timeout=8
+            capture_output=True, text=True, encoding=" utf-8\, errors=\replace\, timeout=8
         )
         if result.returncode == 0 and result.stdout.strip():
             return f"Brightness {'increased' if delta > 0 else 'decreased'} to {result.stdout.strip()}%."
@@ -230,7 +230,7 @@ def _win_brightness_set(value: int):
              f"$m = Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightnessMethods;"
              f"$m | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{{Timeout=1; Brightness={value}}};"
              f"Write-Output 'OK'"],
-            capture_output=True, text=True, timeout=8
+            capture_output=True, text=True, encoding=" utf-8\, errors=\replace\, timeout=8
         )
         if result.returncode == 0:
             return f"Brightness set to {value}%."
@@ -342,7 +342,7 @@ def brightness_get() -> str:
             result = subprocess.run(
                 ["powershell", "-NoProfile", "-Command",
                  "(Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightness).CurrentBrightness"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, encoding=" utf-8\, errors=\replace\, timeout=5
             )
             if result.returncode == 0 and result.stdout.strip():
                 return f"Current brightness: {result.stdout.strip()}%"
@@ -353,15 +353,15 @@ def brightness_get() -> str:
         try:
             result = subprocess.run(
                 ["osascript", "-e", 'tell application "System Events" to get brightness of display 1'],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, encoding=" utf-8\, errors=\replace\, timeout=5
             )
             return f"Current brightness: {result.stdout.strip()}"
         except Exception:
             return "Could not read brightness on macOS."
     else:
         try:
-            result = subprocess.run(["brightnessctl", "get"], capture_output=True, text=True, timeout=5)
-            max_result = subprocess.run(["brightnessctl", "max"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["brightnessctl", "get"], capture_output=True, text=True, encoding=" utf-8\, errors=\replace\, timeout=5)
+            max_result = subprocess.run(["brightnessctl", "max"], capture_output=True, text=True, encoding=" utf-8\, errors=\replace\, timeout=5)
             cur = int(result.stdout.strip())
             mx = int(max_result.stdout.strip())
             pct = int(cur / mx * 100)
@@ -804,8 +804,8 @@ Rules:
 - For type_text: value is the exact text to type.
 - For press_key: value is the key name (e.g. "f5", "tab", "enter").
 - For reload_n: value is an integer (number of times to reload).
-- "increase brightness" → brightness_up, "reduce brightness" → brightness_down
-- "set brightness to 50" → brightness_set with value 50
+- "increase brightness" â†’ brightness_up, "reduce brightness" â†’ brightness_down
+- "set brightness to 50" â†’ brightness_set with value 50
 - If no clear match, pick the closest action.
 - Return ONLY the JSON, no explanation, no markdown."""
 

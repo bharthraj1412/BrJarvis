@@ -178,6 +178,7 @@ def _schedule_windows(target_dt: datetime, task_name: str,
     result = subprocess.run(
         ["schtasks", "/Create", "/TN", task_name, "/XML", str(xml_path), "/F"],
         capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
     )
 
     try:
@@ -233,6 +234,7 @@ def _schedule_mac(target_dt: datetime, task_name: str,
     result = subprocess.run(
         ["launchctl", "load", str(plist_path)],
         capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
     )
 
     if result.returncode != 0:
@@ -259,6 +261,7 @@ def _schedule_linux(target_dt: datetime, task_name: str,
                 sys.executable, str(script_path),
             ],
             capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
         )
         if result.returncode == 0:
             return task_name
@@ -269,7 +272,8 @@ def _schedule_linux(target_dt: datetime, task_name: str,
         cmd_str = f"{sys.executable} {script_path}\n"
         result  = subprocess.run(
             ["at", at_time],
-            input=cmd_str, capture_output=True, text=True,
+            input=cmd_str, capture_output=True, text=True,\r
+            encoding="utf-8", errors="replace",
         )
         if result.returncode == 0:
             return task_name

@@ -19,7 +19,8 @@ class ReconEngine:
     def whois(self, domain: str) -> str:
         self._check(domain)
         result = subprocess.run(["whois", domain],
-                                capture_output=True, text=True, timeout=10)
+                                capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=10)
         self.scope.audit_log("whois", domain, "ok")
         return result.stdout
 
@@ -30,7 +31,8 @@ class ReconEngine:
             try:
                 result = subprocess.run(
                     ["nslookup", "-type=" + rtype, domain],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=5
                 )
                 records[rtype] = result.stdout.strip().splitlines()
             except Exception as e:

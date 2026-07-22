@@ -193,7 +193,8 @@ def main():
         try:
             result = subprocess.run(
                 [sys.executable, "-m", "pip", "install", pkg, "--quiet"],
-                capture_output=True, text=True
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace"
             )
             if result.returncode == 0:
                 print_ok(f"Installed: {pkg}")

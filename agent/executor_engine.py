@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
@@ -69,7 +70,7 @@ class ParallelExecutionEngine:
 
             # Execute tool if resolver provided
             if tool_resolver_fn:
-                if asyncio.iscoroutinefunction(tool_resolver_fn):
+                if inspect.iscoroutinefunction(tool_resolver_fn):
                     res = await tool_resolver_fn(step.tool, step.parameters)
                 else:
                     res = tool_resolver_fn(step.tool, step.parameters)

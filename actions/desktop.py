@@ -280,7 +280,8 @@ def get_current_wallpaper() -> str:
             )
             result = subprocess.run(
                 ["osascript", "-e", script],
-                capture_output=True, text=True
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace"
             )
             return f"Current wallpaper: {result.stdout.strip()}"
 
@@ -289,7 +290,8 @@ def get_current_wallpaper() -> str:
             if "gnome" in desktop_env or "unity" in desktop_env:
                 result = subprocess.run(
                     ["gsettings", "get", "org.gnome.desktop.background", "picture-uri"],
-                    capture_output=True, text=True
+                    capture_output=True, text=True,
+                    encoding="utf-8", errors="replace"
                 )
                 return f"Current wallpaper: {result.stdout.strip()}"
             return "Wallpaper path retrieval not supported for this desktop environment."

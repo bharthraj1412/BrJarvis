@@ -121,7 +121,8 @@ def _get_fallback_info() -> dict:
                  "$total=[math]::Round($mem.TotalVisibleMemorySize/1MB,1);"
                  "$free=[math]::Round($mem.FreePhysicalMemory/1MB,1);"
                  "Write-Output \"$cpu|$total|$free\""],
-                capture_output=True, text=True, timeout=10
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=10
             )
             if result.returncode == 0:
                 parts = result.stdout.strip().split("|")
@@ -134,29 +135,34 @@ def _get_fallback_info() -> dict:
     elif _OS == "Darwin":
         # macOS
         try:
-            result = subprocess.run(["uptime"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["uptime"], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=5)
             info["uptime"] = result.stdout.strip()
         except Exception:
             pass
         try:
-            result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=5)
             info["disk"] = result.stdout.strip()
         except Exception:
             pass
     else:
         # Linux
         try:
-            result = subprocess.run(["uptime"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["uptime"], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=5)
             info["uptime"] = result.stdout.strip()
         except Exception:
             pass
         try:
-            result = subprocess.run(["free", "-h"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["free", "-h"], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=5)
             info["memory"] = result.stdout.strip()
         except Exception:
             pass
         try:
-            result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=5)
             info["disk"] = result.stdout.strip()
         except Exception:
             pass

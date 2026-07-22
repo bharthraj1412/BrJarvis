@@ -135,7 +135,8 @@ def _install_dependencies(deps: list, project_dir: Path) -> str:
     for dep in deps:
         pkg = re.split(r"[>=<!]", dep)[0].strip()
         r = subprocess.run([sys.executable, "-m", "pip", "show", pkg],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         if r.returncode != 0:
             to_install.append(dep)
     if not to_install:
@@ -143,7 +144,8 @@ def _install_dependencies(deps: list, project_dir: Path) -> str:
     try:
         subprocess.run(
             [sys.executable, "-m", "pip", "install"] + to_install,
-            capture_output=True, text=True, timeout=120
+            capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=120
         )
         return f"Installed: {', '.join(to_install)}"
     except Exception as e:
@@ -232,7 +234,8 @@ def _auto_install_missing(error: str, project_dir: Path) -> bool:
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", pkg],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=60
         )
         return result.returncode == 0
     except Exception:

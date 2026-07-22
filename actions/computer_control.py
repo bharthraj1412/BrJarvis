@@ -104,7 +104,8 @@ def _screen_size() -> tuple[int, int]:
 
     if _OS == "Linux":
         try:
-            res = subprocess.run(["xrandr"], capture_output=True, text=True, timeout=3)
+            res = subprocess.run(["xrandr"], capture_output=True, text=True,
+                                 encoding="utf-8", errors="replace", timeout=3)
             import re
             m = re.search(r"current\s+(\d+)\s+x\s+(\d+)", res.stdout)
             if m:
@@ -113,7 +114,8 @@ def _screen_size() -> tuple[int, int]:
             pass
 
         try:
-            res = subprocess.run(["xdotool", "getdisplaygeometry"], capture_output=True, text=True, timeout=3)
+            res = subprocess.run(["xdotool", "getdisplaygeometry"], capture_output=True, text=True,
+                                 encoding="utf-8", errors="replace", timeout=3)
             parts = res.stdout.strip().split()
             if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
                 return int(parts[0]), int(parts[1])

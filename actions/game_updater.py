@@ -175,11 +175,11 @@ def _is_steam_running() -> bool:
     try:
         if is_windows():
             out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq steam.exe"],
-                                 capture_output=True, text=True).stdout
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             return "steam.exe" in out.lower()
         proc = "steam_osx" if is_mac() else "steam"
         return bool(subprocess.run(["pgrep", "-x", proc],
-                                   capture_output=True, text=True).stdout.strip())
+                                   capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip())
     except Exception:
         return False
 
@@ -749,7 +749,7 @@ def _is_epic_running() -> bool:
             return "epicgameslauncher.exe" in out.lower()
         proc = "EpicGamesLauncher" if is_mac() else "heroic"
         return bool(subprocess.run(["pgrep", "-x", proc],
-                                   capture_output=True, text=True).stdout.strip())
+                                   capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip())
     except Exception:
         return False
 
@@ -813,7 +813,7 @@ def _schedule_windows(hour: int, minute: int) -> str:
         cmd    = ["schtasks", "/Create", "/TN", task_name,
                   "/TR", f'"{sys.executable}" "{script_path}" --scheduled',
                   "/SC", "DAILY", "/ST", f"{hour:02d}:{minute:02d}", "/F", *extra]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if result.returncode == 0:
             return f"Daily game update scheduled at {hour:02d}:{minute:02d}."
     return f"Scheduling failed: {result.stderr.strip()}"
@@ -846,7 +846,7 @@ def _schedule_mac(hour: int, minute: int) -> str:
         plist_path.write_text(plist_content, encoding="utf-8")
         subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
         result = subprocess.run(["launchctl", "load", str(plist_path)],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, encoding="utf-8", errors="replace")
         if result.returncode == 0:
             return f"Daily game update scheduled at {hour:02d}:{minute:02d} via launchd."
         return f"Scheduling failed: {result.stderr.strip()}"
@@ -859,13 +859,13 @@ def _schedule_linux(hour: int, minute: int) -> str:
     marker      = "# JARVIS_GameUpdater"
     cron_entry  = f"{minute} {hour} * * * {sys.executable} {script_path} --scheduled  {marker}"
     try:
-        existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace")
         lines    = [l for l in existing.stdout.splitlines()
                     if marker not in l and str(script_path) not in l]
         lines.append(cron_entry)
         proc = subprocess.run(["crontab", "-"],
                               input="\n".join(lines) + "\n",
-                              text=True, capture_output=True)
+                              text=True, capture_output=True, encoding="utf-8", errors="replace")
         if proc.returncode == 0:
             return f"Daily game update scheduled at {hour:02d}:{minute:02d} via cron."
         return f"Scheduling failed: {proc.stderr.strip()}"
@@ -890,7 +890,7 @@ def _cancel_scheduled_update() -> str:
         return "No scheduled update found."
 
     try:
-        existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace")
         lines    = [l for l in existing.stdout.splitlines()
                     if "JARVIS_GameUpdater" not in l]
         subprocess.run(["crontab", "-"],
@@ -920,7 +920,7 @@ def _get_schedule_status() -> str:
                 if plist_path.exists() else "No scheduled game update found.")
 
     try:
-        result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        result = subprocess.run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace")
         if "JARVIS_GameUpdater" in result.stdout:
             for line in result.stdout.splitlines():
                 if "JARVIS_GameUpdater" in line:

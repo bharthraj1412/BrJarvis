@@ -25,8 +25,22 @@ if sys.platform == "win32":
         pass
 
 
+# Use Rich console if available, else ANSI fallback
+try:
+    from rich.console import Console
+    _console = Console()
+    def _print(text: str):
+        _console.print(text)
+except ImportError:
+    def _print(text: str):
+        text = text.replace("[green]", "\033[92m").replace("[/]", "\033[0m")
+        text = text.replace("[red]", "\033[91m")
+        text = text.replace("[yellow]", "\033[93m")
+        print(text)
+
+
 def print_header(title: str):
-    print(f"\n=== {title.upper()} ===")
+    _print(f"\n=== {title.upper()} ===")
 
 
 def test_dependencies() -> bool:
@@ -49,12 +63,12 @@ def test_dependencies() -> bool:
     for module_name, desc in required.items():
         try:
             __import__(module_name)
-            print(f"  ● {desc:<40} -> [green]INSTALLED[/]")
+            _print(f"  ● {desc:<40} -> [green]INSTALLED[/]")
         except ImportError:
-            print(f"  ● {desc:<40} -> [red]MISSING[/]")
+            _print(f"  ● {desc:<40} -> [red]MISSING[/]")
             all_ok = False
         except Exception as e:
-            print(f"  ● {desc:<40} -> [yellow]INSTALLED (Display/Init note: {e})[/]")
+            _print(f"  ● {desc:<40} -> [yellow]INSTALLED (Display/Init note: {e})[/]")
     return all_ok
 
 
@@ -72,7 +86,7 @@ def test_backends() -> bool:
         backends = load_available_backends()
         router = AgentRouter(backends)
     except Exception as e:
-        print(f"  [red]Failed to initialize AgentRouter: {e}[/]")
+        _print(f"  [red]Failed to initialize AgentRouter: {e}[/]")
         return False
 
     if not backends:
@@ -90,12 +104,12 @@ def test_backends() -> bool:
             ok = backend.ping(timeout=3.0)
             elapsed = (time.monotonic() - start) * 1000
             if ok:
-                print(f"  ● {backend.name:10s} ({backend.model_name}) -> [green]ONLINE ({elapsed:.1f}ms)[/]")
+                _print(f"  ● {backend.name:10s} ({backend.model_name}) -> [green]ONLINE ({elapsed:.1f}ms)[/]")
             else:
-                print(f"  ● {backend.name:10s} ({backend.model_name}) -> [red]OFFLINE (ping failed)[/]")
+                _print(f"  ● {backend.name:10s} ({backend.model_name}) -> [red]OFFLINE (ping failed)[/]")
                 all_pings_ok = False
         except Exception as e:
-            print(f"  ● {backend.name:10s} ({backend.model_name}) -> [red]FAILED ({e})[/]")
+            _print(f"  ● {backend.name:10s} ({backend.model_name}) -> [red]FAILED ({e})[/]")
             all_pings_ok = False
 
     return all_pings_ok
@@ -113,12 +127,12 @@ def test_tool_registry() -> bool:
         expected = ["web_search", "file_read", "cli_controller", "memory_save", "spawn_agent"]
         for exp in expected:
             if exp in names:
-                print(f"  ● Tool '{exp}' check -> [green]OK[/]")
+                _print(f"  ● Tool '{exp}' check -> [green]OK[/]")
             else:
-                print(f"  ● Tool '{exp}' check -> [red]MISSING[/]")
+                _print(f"  ● Tool '{exp}' check -> [red]MISSING[/]")
         return True
     except Exception as e:
-        print(f"  [red]Error loading tool registry: {e}[/]")
+        _print(f"  [red]Error loading tool registry: {e}[/]")
         return False
 
 
@@ -128,7 +142,7 @@ def test_memory_layers() -> bool:
         from memory.persistent_store import get_memory_dir
         mem_dir = get_memory_dir("user")
         print(f"  ● User memory directory: {mem_dir}")
-        print(f"  ● Directory exists: {'[green]Yes[/]' if mem_dir.exists() else '[yellow]No (will auto-create)[/]'}")
+        _print(f"  ● Directory exists: {'[green]Yes[/]' if mem_dir.exists() else '[yellow]No (will auto-create)[/]'}")
         
         # SQLite memory store check
         sqlite_db = mem_dir / "memory.db"
@@ -139,7 +153,7 @@ def test_memory_layers() -> bool:
                 conn.close()
                 print("  ● SQLite persistent store -> [green]OK[/]")
             except Exception as e:
-                print(f"  ● SQLite persistent store -> [red]CORRUPT ({e})[/]")
+                _print(f"  ● SQLite persistent store -> [red]CORRUPT ({e})[/]")
         else:
             print("  ● SQLite persistent store -> [yellow]NEW (database will be generated on first save)[/]")
 
@@ -152,17 +166,17 @@ def test_memory_layers() -> bool:
                 conn.close()
                 print("  ● SQLite conversation store -> [green]OK[/]")
             except Exception as e:
-                print(f"  ● SQLite conversation store -> [red]CORRUPT ({e})[/]")
+                _print(f"  ● SQLite conversation store -> [red]CORRUPT ({e})[/]")
         else:
             print("  ● SQLite conversation store -> [yellow]NEW (database will be generated on boot)[/]")
 
         # Vector fallback check
         from memory.vector_store import VectorMemory
         vm = VectorMemory()
-        print(f"  ● Vector memory available: {'[green]Yes[/]' if vm.available else '[red]No[/]'}")
+        _print(f"  ● Vector memory available: {'[green]Yes[/]' if vm.available else '[red]No[/]'}")
         return True
     except Exception as e:
-        print(f"  [red]Memory validation failed: {e}[/]")
+        _print(f"  [red]Memory validation failed: {e}[/]")
         return False
 
 
@@ -197,7 +211,7 @@ def main():
     else:
         status_summary += "[red]DEGRADED[/] - Correct issues highlighted above."
         
-    print(colorize(status_summary))
+    _print(status_summary)
     print("=" * 60)
 
 

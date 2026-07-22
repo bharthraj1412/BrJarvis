@@ -81,12 +81,14 @@ def _open_app(app_name: str) -> bool:
         elif os_name == "mac":
             result = subprocess.run(
                 ["open", "-a", app_name],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=10,
             )
             if result.returncode != 0:
                 result = subprocess.run(
                     ["open", "-a", f"{app_name}.app"],
-                    capture_output=True, text=True, timeout=10,
+                    capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=10,
                 )
             time.sleep(2.5)
             return result.returncode == 0

@@ -294,7 +294,7 @@ def doctor(auto_confirm: bool = False):
         "opencv-python": "cv2",
         "requests": "requests",
         "httpx": "httpx",
-        "duckduckgo-search": "duckduckgo_search",
+        "ddgs": "ddgs",
         "beautifulsoup4": "bs4",
         "playwright": "playwright",
         "youtube-transcript-api": "youtube_transcript_api",

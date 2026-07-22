@@ -37,7 +37,7 @@ class RollbackEngine:
                 res = subprocess.run(
                     ["git", "checkout", git_hash],
                     capture_output=True,
-                    text=True,
+                    text=True, encoding="utf-8", errors="replace",
                     cwd=".",
                 )
                 if res.returncode == 0:
