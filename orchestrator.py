@@ -338,24 +338,24 @@ class JarvisOrchestrator:
                     _consecutive_tool = {"name": tool_name, "count": 1}
 
                 if _consecutive_tool["count"] >= 3:
-                    warning = (
-                        f"[SYSTEM] You have called '{tool_name}' {_consecutive_tool['count']} times "
-                        f"consecutively. The tool already returned results. "
-                        f"DO NOT call it again. Summarize the results you have and respond to the user."
-                    )
                     print(f"[JARVIS] ⚠️ Duplicate-call guard triggered for '{tool_name}' (x{_consecutive_tool['count']})")
-                    self.working_memory.add("user", warning)
-                    # Skip execution on 4th+ consecutive duplicate
-                    if _consecutive_tool["count"] >= 4:
-                        continue
-                # ── End duplicate guard ───────────────────────────────────
+                    if _consecutive_tool["count"] >= 5:
+                        final_response = (
+                            f"[JARVIS] Duplicate tool execution stopped after {_consecutive_tool['count']} attempts. "
+                            f"Execution completed."
+                        )
+                        self.working_memory.add("user", f"[SYSTEM: '{tool_name}' duplicate call blocked. Respond with current results.]")
+                        break
 
                 print(f"[JARVIS] 🔧 Step {step+1}: {tool_name}({list(tool_args.keys() if tool_args else [])})")
                 t_tool = time.monotonic()
-                try:
-                    tool_result = execute_tool(tool_name, tool_args or {})
-                except Exception as tool_err:
-                    tool_result = f"[Tool Error: {tool_name} failed — {tool_err}. Try an alternative approach.]"
+                if _consecutive_tool["count"] >= 4:
+                    tool_result = f"[SYSTEM NOTICE: '{tool_name}' execution was blocked because it was called {_consecutive_tool['count']} times consecutively. Respond directly to the user now without making any further tool calls.]"
+                else:
+                    try:
+                        tool_result = execute_tool(tool_name, tool_args or {})
+                    except Exception as tool_err:
+                        tool_result = f"[Tool Error: {tool_name} failed — {tool_err}. Try an alternative approach.]"
                 tool_ms = int((time.monotonic() - t_tool) * 1000)
 
                 self._record_turn(
