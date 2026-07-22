@@ -132,6 +132,17 @@ def volume_mute():
 def volume_set(value: int):
     value = max(0, min(100, int(value)))
     if _OS == "Windows":
+        # Method 1: Modern pycaw (pycaw >= 2.0)
+        try:
+            from pycaw.pycaw import AudioUtilities
+            devices = AudioUtilities.GetSpeakers()
+            if hasattr(devices, "EndpointVolume"):
+                devices.EndpointVolume.SetMasterVolumeLevelScalar(value / 100.0, None)
+                return f"Volume set to {value}%."
+        except Exception:
+            pass
+
+        # Method 2: Legacy pycaw (pycaw < 2.0)
         try:
             import math
             from ctypes import cast, POINTER
@@ -142,7 +153,7 @@ def volume_set(value: int):
             vol       = cast(interface, POINTER(IAudioEndpointVolume))
             vol_db    = -65.25 if value == 0 else max(-65.25, 20 * math.log10(value / 100))
             vol.SetMasterVolumeLevel(vol_db, None)
-            return
+            return f"Volume set to {value}%."
         except Exception as e:
             print(f"[Settings] pycaw failed, using keypress fallback: {e}")
             pyautogui.press("volumemute")

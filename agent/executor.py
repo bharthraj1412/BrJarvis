@@ -53,6 +53,11 @@ def _call_tool(tool: str, parameters: dict, speak: Callable | None = None) -> st
         elif act in ("list", "dir", "ls"):
             tool = "file_list"
             params = {"path": params.get("path", ".")}
+    elif tool in ("code_helper", "run_code", "python_runner"):
+        tool = "code_helper"
+        act = params.get("action", "run")
+        if act in ("run_code", "execute", "eval"):
+            params["action"] = "run"
     elif tool in ("generated_code", "web_search_fallback"):
         tool = "web_search"
         params = {"query": params.get("description", str(params))[:200]}

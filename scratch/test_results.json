@@ -1,13 +1,48 @@
 [
     {
+        "display_name": "Gemini 3.6 Flash (High)",
+        "model_id": "gemini-3.6-flash-high",
+        "status_code": "TIMEOUT",
+        "latency": 7.05597186088562,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Gemini 3.6 Flash (Medium)",
+        "model_id": "gemini-3.6-flash-medium",
+        "status_code": "TIMEOUT",
+        "latency": 7.056549787521362,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Gemini 3.6 Flash (Low)",
+        "model_id": "gemini-3.6-flash-low",
+        "status_code": "TIMEOUT",
+        "latency": 7.05971097946167,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Gemini 3.5 Flash (High)",
+        "model_id": "gemini-3.5-flash-high",
+        "status_code": "TIMEOUT",
+        "latency": 7.033953905105591,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Gemini 3.5 Flash (Medium)",
+        "model_id": "gemini-3.5-flash-medium",
+        "status_code": "TIMEOUT",
+        "latency": 7.057601690292358,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
         "display_name": "Gemini 3.5 Flash (Low)",
         "model_id": "gemini-3.5-flash-low",
         "status_code": 200,
-        "latency": 3.8484742641448975,
+        "latency": 5.360616207122803,
         "response": {
-            "id": "chatcmpl-3a13c121-183e-4019-b81f-ed67ca46fd5f",
+            "id": "chatcmpl-1ac26e59-bdbe-4faf-9e92-d7279c38eb51",
             "object": "chat.completion",
-            "created": 1784705532,
+            "created": 1784715640,
             "model": "gemini-3.5-flash-low",
             "choices": [
                 {
@@ -27,14 +62,35 @@
         }
     },
     {
+        "display_name": "Gemini 3.1 Pro (High)",
+        "model_id": "gemini-3.1-pro-high",
+        "status_code": "TIMEOUT",
+        "latency": 7.057165861129761,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Gemini 3.1 Pro (Low)",
+        "model_id": "gemini-3.1-pro-low",
+        "status_code": "TIMEOUT",
+        "latency": 7.0385284423828125,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Claude Sonnet 4.6 (Thinking)",
+        "model_id": "claude-sonnet-4-6-thinking",
+        "status_code": "TIMEOUT",
+        "latency": 7.066312551498413,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
         "display_name": "Claude Opus 4.6 (Thinking)",
         "model_id": "claude-opus-4-6-thinking",
         "status_code": 200,
-        "latency": 5.822614669799805,
+        "latency": 5.684532642364502,
         "response": {
-            "id": "chatcmpl-38d81f1a-4a9a-4da7-af39-bd5fb4fa7c9e",
+            "id": "chatcmpl-4f805a30-ac9e-4816-8504-96422a0b4e50",
             "object": "chat.completion",
-            "created": 1784705534,
+            "created": 1784715669,
             "model": "claude-opus-4-6-thinking",
             "choices": [
                 {
@@ -54,50 +110,14 @@
         }
     },
     {
-        "display_name": "Gemini 3.6 Flash (Medium)",
-        "model_id": "gemini-3.6-flash-medium",
-        "status_code": 500,
-        "latency": 7.798790693283081,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3.5 Flash (High)",
-        "model_id": "gemini-3.5-flash-high",
-        "status_code": 500,
-        "latency": 8.093756914138794,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3.6 Flash (Low)",
-        "model_id": "gemini-3.6-flash-low",
-        "status_code": 500,
-        "latency": 8.290975332260132,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
         "display_name": "GPT-OSS 120B (Medium)",
         "model_id": "gpt-oss-120b-medium",
         "status_code": 200,
-        "latency": 4.5448832511901855,
+        "latency": 4.060362339019775,
         "response": {
-            "id": "chatcmpl-536eebca-fff8-45d8-8999-3b0684d458b4",
+            "id": "chatcmpl-1f9d5220-4938-459d-b24c-630c8f0f580c",
             "object": "chat.completion",
-            "created": 1784705536,
+            "created": 1784715674,
             "model": "gpt-oss-120b-medium",
             "choices": [
                 {
@@ -105,76 +125,28 @@
                     "message": {
                         "role": "assistant",
                         "content": "Hello World",
-                        "reasoning_content": "The user wants exactly 'Hello World' and nothing else. Must respond exactly that."
+                        "reasoning_content": "The user asks: \"Hello! Reply with exactly 'Hello World' and nothing else.\"\n\nWe must obey the instruction: respond exactly with \"Hello World\". No extra punctuation or spaces. Should we include newline? Probably just that text.\n\nWe must also consider policy: This is a harmless request. Just comply."
                     },
                     "finish_reason": "stop"
                 }
             ],
             "usage": {
                 "prompt_tokens": 161,
-                "completion_tokens": 29,
-                "total_tokens": 190
+                "completion_tokens": 74,
+                "total_tokens": 235
             }
         }
     },
     {
-        "display_name": "Gemini 3.6 Flash (High)",
-        "model_id": "gemini-3.6-flash-high",
-        "status_code": 500,
-        "latency": 8.765796184539795,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3.1 Pro (High)",
-        "model_id": "gemini-3.1-pro-high",
-        "status_code": 500,
-        "latency": 8.789377927780151,
-        "response": {
-            "error": {
-                "message": "Request contains an invalid argument.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
-        "display_name": "Claude Sonnet 4.6 (Thinking)",
-        "model_id": "claude-sonnet-4-6-thinking",
-        "status_code": 500,
-        "latency": 9.054192781448364,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3.5 Flash (Medium)",
-        "model_id": "gemini-3.5-flash-medium",
-        "status_code": 500,
-        "latency": 10.349294185638428,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3.1 Pro (Low)",
-        "model_id": "gemini-3.1-pro-low",
+        "display_name": "Gemini 3.6 Flash Tiered",
+        "model_id": "gemini-3.6-flash-tiered",
         "status_code": 200,
-        "latency": 12.17672610282898,
+        "latency": 3.818619966506958,
         "response": {
-            "id": "chatcmpl-84d38ce2-bfa2-43f3-88e7-54e5aaaa8f2c",
+            "id": "chatcmpl-fde10b07-e0a1-4106-a82f-c1ba3a35cfe4",
             "object": "chat.completion",
-            "created": 1784705540,
-            "model": "gemini-3.1-pro-low",
+            "created": 1784715678,
+            "model": "gemini-3.6-flash-tiered",
             "choices": [
                 {
                     "index": 0,
@@ -187,27 +159,42 @@
             ],
             "usage": {
                 "prompt_tokens": 89,
-                "completion_tokens": 2,
-                "total_tokens": 91
+                "completion_tokens": 1,
+                "total_tokens": 90
             }
         }
     },
     {
         "display_name": "Gemini 3.5 Flash Extra Low",
         "model_id": "gemini-3.5-flash-extra-low",
+        "status_code": "TIMEOUT",
+        "latency": 7.0561089515686035,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Gemini 3.1 Flash Lite",
+        "model_id": "gemini-3.1-flash-lite",
+        "status_code": "TIMEOUT",
+        "latency": 7.048371315002441,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
+    },
+    {
+        "display_name": "Gemini 3 Flash",
+        "model_id": "gemini-3-flash",
         "status_code": 200,
-        "latency": 4.439813137054443,
+        "latency": 4.935105800628662,
         "response": {
-            "id": "chatcmpl-215a5e01-bbfd-4e89-8659-1d2c80e7aeea",
+            "id": "chatcmpl-1b5d426a-f7ed-47bf-81ac-30625cc42369",
             "object": "chat.completion",
-            "created": 1784705540,
-            "model": "gemini-3.5-flash-extra-low",
+            "created": 1784715699,
+            "model": "gemini-3-flash",
             "choices": [
                 {
                     "index": 0,
                     "message": {
                         "role": "assistant",
-                        "content": "Hello World"
+                        "content": "Hello World",
+                        "reasoning_content": "**My Immediate Response**\n\nOkay, the instruction is crystal clear: I'm being told to respond with *only* \"Hello World.\" There's no room for interpretation, no need for elaboration, and certainly no opportunity for cleverness. Precision is the key here. It's a direct command, and deviating from it would be a failure. So, I will comply.\n\n\n"
                     },
                     "finish_reason": "stop"
                 }
@@ -223,11 +210,11 @@
         "display_name": "Gemini 3 Flash Agent",
         "model_id": "gemini-3-flash-agent",
         "status_code": 200,
-        "latency": 5.270197629928589,
+        "latency": 4.647538185119629,
         "response": {
-            "id": "chatcmpl-80759a37-7428-4e9d-8488-e594537d9224",
+            "id": "chatcmpl-43cada33-46ec-49cc-a5bc-1b257be621fb",
             "object": "chat.completion",
-            "created": 1784705542,
+            "created": 1784715704,
             "model": "gemini-3-flash-agent",
             "choices": [
                 {
@@ -235,7 +222,7 @@
                     "message": {
                         "role": "assistant",
                         "content": "Hello World",
-                        "reasoning_content": "**My Response Generation Strategy**\n\nOkay, here's how I'm approaching this. First, I'm carefully analyzing the user's request: they've explicitly asked for *only* \"Hello World,\" and no other text or explanation. It seems like a simple task, but precision is key here. I'm double-checking to ensure I understand the constraint: I can't deviate even slightly.\n\nNext, I'm running a quick mental checklist to confirm I'm following instructions perfectly. I am verifying that no other text is acceptable and that I am providing the *exact* string \"Hello World\". My confidence level on this is high \u2013 a solid 5 out of 5.\n\nTherefore, the output is perfectly clear: I am simply generating \"Hello World.\"\n\n\n"
+                        "reasoning_content": "**My Sole Purpose**\n\nOkay, the user wants a very specific response: \"Hello World.\" No deviations, no embellishments, nothing else. This is the only acceptable output. Got it. It's a simple directive, but I need to ensure 100% compliance. I will output \"Hello World\" and that's the end of it.\n\n\n"
                     },
                     "finish_reason": "stop"
                 }
@@ -244,71 +231,14 @@
                 "prompt_tokens": 89,
                 "completion_tokens": 2,
                 "total_tokens": 91
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3 Flash",
-        "model_id": "gemini-3-flash",
-        "status_code": 200,
-        "latency": 5.440154314041138,
-        "response": {
-            "id": "chatcmpl-ac3ff085-05a8-4495-b490-38bde2a88c5b",
-            "object": "chat.completion",
-            "created": 1784705542,
-            "model": "gemini-3-flash",
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": "Hello World",
-                        "reasoning_content": "**My Immediate Response to the User's Directive**\n\nOkay, so the user wants me to deliver a very specific output: \"Hello World.\" No deviations, no embellishments, nothing but those two words. I need to be precise, absolutely literal. The system prompt is screaming this directive at me, so I need to make sure I don't get sidetracked by any of my usual tendencies towards explanation or context. This is purely about execution. I'm internalizing the constraint: \"exactly 'Hello World' and nothing else.\" No introductions, no farewells, no clever formatting \u2013 just the literal string. My output should, therefore, be \"Hello World\". Done.\n\n\n"
-                    },
-                    "finish_reason": "stop"
-                }
-            ],
-            "usage": {
-                "prompt_tokens": 89,
-                "completion_tokens": 2,
-                "total_tokens": 91
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3.6 Flash Tiered",
-        "model_id": "gemini-3.6-flash-tiered",
-        "status_code": 500,
-        "latency": 8.292651653289795,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
-    },
-    {
-        "display_name": "Gemini 3.1 Flash Lite",
-        "model_id": "gemini-3.1-flash-lite",
-        "status_code": 500,
-        "latency": 8.251983404159546,
-        "response": {
-            "error": {
-                "message": "* GenerateContentRequest.safety_settings[4]: element predicate failed: $.category in (HarmCategory.HARM_CATEGORY_HATE_SPEECH, HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, HarmCategory.HARM_CATEGORY_HARASSMENT, HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, HarmCategory.HARM_CATEGORY_JAILBREAK)",
-                "type": "server_error"
             }
         }
     },
     {
         "display_name": "Claude Sonnet 4.6 (Standard)",
         "model_id": "claude-sonnet-4-6",
-        "status_code": 500,
-        "latency": 8.211355209350586,
-        "response": {
-            "error": {
-                "message": "Requested entity was not found.",
-                "type": "server_error"
-            }
-        }
+        "status_code": "TIMEOUT",
+        "latency": 7.029825210571289,
+        "response": "HTTPConnectionPool(host='localhost', port=8045): Read timed out. (read timeout=5)"
     }
 ]

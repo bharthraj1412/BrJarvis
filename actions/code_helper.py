@@ -44,10 +44,24 @@ def _resolve_save_path(output_path: str, language: str) -> Path:
     return DESKTOP / f"jarvis_code{ext}"
 
 
+def _normalize_path(file_path: str | Path | None) -> Path:
+    if not file_path:
+        return Path()
+    p_str = str(file_path).replace("\\", "/")
+    if p_str.startswith("/tmp/") or p_str.startswith("tmp/"):
+        rel = p_str.lstrip("/")
+        if rel.startswith("tmp/"):
+            rel = rel[4:]
+        ws = Path(__file__).resolve().parent.parent / "workspace" / "tmp"
+        ws.mkdir(parents=True, exist_ok=True)
+        return ws / rel
+    return Path(file_path)
+
+
 def _read_file(file_path: str) -> tuple[str, str]:
     if not file_path:
         return "", "No file path provided."
-    p = Path(file_path)
+    p = _normalize_path(file_path)
     if not p.exists():
         return "", f"File not found: {file_path}"
     try:
@@ -191,10 +205,18 @@ def code_helper(parameters: dict, response=None, player=None, session_memory=Non
         prompt = f"Explain this code clearly in 3-5 sentences:\n\n{code[:4000]}"
         return gemini.complete([{"role": "user", "content": prompt}])
 
-    elif action == "run":
+    elif action in ("run", "run_code", "execute"):
+        if not file_path and code:
+            tmp_path = _normalize_path("/tmp/temp_inline_code.py")
+            _save_file(tmp_path, code)
+            return _run_file(tmp_path, args, timeout)
+        if not file_path and description:
+            # Generate code from description and run
+            code_str, tmp_path = _write_code(description, language or "python", "")
+            return _run_file(tmp_path, args, timeout)
         if not file_path:
-            return "Please provide a file path to run."
-        p_path = Path(file_path)
+            return "Please provide a file path or code to run."
+        p_path = _normalize_path(file_path)
         if not p_path.exists():
             return f"File not found: {file_path}"
         return _run_file(p_path, args, timeout)

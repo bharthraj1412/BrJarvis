@@ -39,6 +39,7 @@ class CodeSandbox:
             result = subprocess.run(
                 self._cmd(lang, fname),
                 capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
                 timeout=timeout,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )

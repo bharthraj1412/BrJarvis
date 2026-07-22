@@ -303,6 +303,7 @@ class JarvisOrchestrator:
 
         final_response = ""
         success = True
+        _consecutive_tool: dict = {"name": None, "count": 0}  # duplicate-call guard
 
         for step in range(MAX_REACT_STEPS):
             t_start = time.monotonic()
@@ -324,6 +325,25 @@ class JarvisOrchestrator:
             tool_name, tool_args = parse_tool_call(response)
 
             if tool_name:
+                # ── Duplicate-call guard ──────────────────────────────────
+                if tool_name == _consecutive_tool["name"]:
+                    _consecutive_tool["count"] += 1
+                else:
+                    _consecutive_tool = {"name": tool_name, "count": 1}
+
+                if _consecutive_tool["count"] >= 3:
+                    warning = (
+                        f"[SYSTEM] You have called '{tool_name}' {_consecutive_tool['count']} times "
+                        f"consecutively. The tool already returned results. "
+                        f"DO NOT call it again. Summarize the results you have and respond to the user."
+                    )
+                    print(f"[JARVIS] ⚠️ Duplicate-call guard triggered for '{tool_name}' (x{_consecutive_tool['count']})")
+                    self.working_memory.add("user", warning)
+                    # Skip execution on 4th+ consecutive duplicate
+                    if _consecutive_tool["count"] >= 4:
+                        continue
+                # ── End duplicate guard ───────────────────────────────────
+
                 print(f"[JARVIS] 🔧 Step {step+1}: {tool_name}({list(tool_args.keys() if tool_args else [])})")
                 t_tool = time.monotonic()
                 try:

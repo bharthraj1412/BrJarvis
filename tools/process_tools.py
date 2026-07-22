@@ -83,7 +83,7 @@ def kill_process(args: dict) -> str:
         else:
             cmd = f"taskkill /F /IM {identifier}"
         try:
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
             if res.returncode == 0:
                 return f"Successfully terminated process '{identifier}'."
             return f"Failed to kill process: {res.stderr.strip()}"

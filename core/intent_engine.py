@@ -49,6 +49,12 @@ class DeterministicIntentEngine:
         clean = text.lower().strip().rstrip(".!;")
         lines = [line.strip().lower() for line in text.splitlines() if line.strip()]
 
+        # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
+        if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
+            return None
+        if len(text.split()) > 10 and not clean.startswith(("/run", "open ", "launch ")):
+            return None
+
         # 1. Match App Launch Intent (e.g., "open excel", "launch chrome", "start notepad")
         launch_match = re.search(r"^(?:open|launch|start|run)\s+([a-z0-9_\-\s]+)$", clean)
         if launch_match:
