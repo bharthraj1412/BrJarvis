@@ -82,7 +82,6 @@ class ClaudeBackend(BaseBackend):
             return response.content[0].text
         except Exception as e:
             print(f"[Claude] Error: {e}")
-            traceback.print_exc()
             raise
 
     def stream(self, messages: list, system: str = "") -> Generator[str, None, None]:

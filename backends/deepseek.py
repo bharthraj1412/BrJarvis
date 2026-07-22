@@ -67,7 +67,6 @@ class DeepSeekBackend(BaseBackend):
             return response.choices[0].message.content or ""
         except Exception as e:
             print(f"[DeepSeek] Error during completion: {e}")
-            traceback.print_exc()
             raise
 
     def stream(self, messages: List[Dict[str, Any]], system: str = "") -> Generator[str, None, None]:

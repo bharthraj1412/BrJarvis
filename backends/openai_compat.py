@@ -82,7 +82,6 @@ class OpenAIBackend(BaseBackend):
             return response.choices[0].message.content
         except Exception as e:
             print(f"[OpenAI] Error: {e}")
-            traceback.print_exc()
             raise
 
     def stream(self, messages: list, system: str = "") -> Generator[str, None, None]:
