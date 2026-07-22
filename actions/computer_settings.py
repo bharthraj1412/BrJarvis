@@ -843,14 +843,14 @@ def computer_settings(
                 f"Please confirm by calling again with confirmed=yes."
             )
 
-    if action == "volume_set":
+    if action in ("volume", "volume_set"):
         try:
             volume_set(int(value or 50))
             return f"Volume set to {value}%."
         except Exception as e:
             return f"Could not set volume: {e}"
 
-    if action == "brightness_set":
+    if action in ("brightness", "brightness_set"):
         try:
             brightness_set(int(value or 50))
             return f"Brightness set to {value}%."

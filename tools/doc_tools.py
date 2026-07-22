@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import subprocess
 from pathlib import Path
@@ -30,6 +31,32 @@ except ImportError:
 
 def _get_workspace_dir() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+def _add_paragraph_runs(p, text: str):
+    """Helper to split string on markdown '**' bold markers and append runs to a paragraph."""
+    parts = text.split("**")
+    is_bold = False
+    for part in parts:
+        if part:
+            run = p.add_run(part)
+            run.bold = is_bold
+        is_bold = not is_bold
+
+
+def _write_formatted_pdf_text(pdf, text: str):
+    """Helper to split string on markdown '**' bold markers and write inline text to FPDF."""
+    parts = text.split("**")
+    is_bold = False
+    for part in parts:
+        if part:
+            if is_bold:
+                pdf.set_font("Helvetica", size=10, style="B")
+            else:
+                pdf.set_font("Helvetica", size=10)
+            pdf.write(5, part)
+        is_bold = not is_bold
+    pdf.ln(6)
 
 
 @register_tool(
@@ -68,20 +95,73 @@ def create_word_document(args: dict) -> str:
     h1.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     # Add content lines
-    for line in content.splitlines():
+    lines = content.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         line_s = line.strip()
         if not line_s:
+            i += 1
             continue
+
+        # Parse markdown tables
+        if line_s.startswith("|") and i + 1 < len(lines) and lines[i+1].strip().startswith("|"):
+            table_lines = []
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                table_lines.append(lines[i].strip())
+                i += 1
+            
+            parsed_rows = []
+            for tl in table_lines:
+                cells = [c.strip() for c in tl.split("|")[1:-1]]
+                is_sep = all(all(ch in "-: " for ch in cell) for cell in cells) if cells else False
+                if not is_sep:
+                    parsed_rows.append(cells)
+            
+            if parsed_rows:
+                num_cols = max(len(row) for row in parsed_rows)
+                table = doc.add_table(rows=0, cols=num_cols)
+                try:
+                    table.style = 'Light Shading Accent 1'
+                except Exception:
+                    table.style = 'Table Grid'
+                
+                for r_idx, row_cells in enumerate(parsed_rows):
+                    row = table.add_row()
+                    for c_idx, cell_text in enumerate(row_cells):
+                        if c_idx < len(row.cells):
+                            cell = row.cells[c_idx]
+                            p = cell.paragraphs[0]
+                            _add_paragraph_runs(p, cell_text)
+                            if r_idx == 0:
+                                for run in p.runs:
+                                    run.bold = True
+            continue
+
+        # Headings
         if line_s.startswith("# "):
             doc.add_heading(line_s[2:], level=1)
         elif line_s.startswith("## "):
             doc.add_heading(line_s[3:], level=2)
         elif line_s.startswith("### "):
             doc.add_heading(line_s[4:], level=3)
+        # Bullet list items
         elif line_s.startswith("- ") or line_s.startswith("* "):
-            doc.add_paragraph(line_s[2:], style="List Bullet")
+            p = doc.add_paragraph(style="List Bullet")
+            _add_paragraph_runs(p, line_s[2:])
+        # Numbered list items
+        elif re.match(r'^\d+\.\s+', line_s):
+            match = re.match(r'^(\d+\.\s+)(.*)', line_s)
+            p = doc.add_paragraph()
+            p.paragraph_format.left_indent = Inches(0.25)
+            run = p.add_run(match.group(1))
+            run.bold = True
+            _add_paragraph_runs(p, match.group(2))
         else:
-            doc.add_paragraph(line_s)
+            p = doc.add_paragraph()
+            _add_paragraph_runs(p, line_s)
+            
+        i += 1
 
     try:
         doc.save(out_path)
@@ -135,19 +215,83 @@ def create_pdf_document(args: dict) -> str:
     pdf.cell(200, 10, txt=title.encode("latin-1", "replace").decode("latin-1"), ln=True, align="L")
     pdf.ln(5)
 
-    pdf.set_font("Helvetica", size=11)
+    pdf.set_font("Helvetica", size=10)
 
-    for line in content.splitlines():
-        line_clean = line.encode("latin-1", "replace").decode("latin-1")
-        if not line_clean.strip():
+    lines = content.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        line_clean = line.encode("latin-1", "replace").decode("latin-1").strip()
+        if not line_clean:
             pdf.ln(3)
+            i += 1
             continue
-        if line_clean.startswith("#"):
-            pdf.set_font("Helvetica", size=13, style="B")
-            pdf.cell(0, 8, txt=line_clean.lstrip("#").strip(), ln=True)
-            pdf.set_font("Helvetica", size=11)
+
+        # Parse markdown tables
+        if line_clean.startswith("|") and i + 1 < len(lines) and lines[i+1].encode("latin-1", "replace").decode("latin-1").strip().startswith("|"):
+            table_lines = []
+            while i < len(lines) and lines[i].encode("latin-1", "replace").decode("latin-1").strip().startswith("|"):
+                table_lines.append(lines[i].encode("latin-1", "replace").decode("latin-1").strip())
+                i += 1
+            
+            parsed_rows = []
+            for tl in table_lines:
+                cells = [c.strip() for c in tl.split("|")[1:-1]]
+                is_sep = all(all(ch in "-: " for ch in cell) for cell in cells) if cells else False
+                if not is_sep:
+                    parsed_rows.append(cells)
+            
+            if parsed_rows:
+                num_cols = len(parsed_rows[0])
+                col_width = 190.0 / num_cols
+                
+                # Header row style
+                pdf.set_font("Helvetica", size=9, style="B")
+                pdf.set_fill_color(225, 235, 245)
+                for cell in parsed_rows[0]:
+                    pdf.cell(col_width, 8, cell, border=1, fill=True)
+                pdf.ln()
+                
+                # Data rows style
+                pdf.set_font("Helvetica", size=9)
+                for row in parsed_rows[1:]:
+                    for cell in row:
+                        pdf.cell(col_width, 8, cell, border=1)
+                    pdf.ln()
+                pdf.ln(4)
+            continue
+
+        # Headings
+        if line_clean.startswith("# "):
+            pdf.ln(4)
+            pdf.set_font("Helvetica", size=14, style="B")
+            pdf.cell(0, 8, txt=line_clean[2:], ln=True)
+            pdf.ln(2)
+        elif line_clean.startswith("## "):
+            pdf.ln(3)
+            pdf.set_font("Helvetica", size=12, style="B")
+            pdf.cell(0, 7, txt=line_clean[3:], ln=True)
+            pdf.ln(2)
+        elif line_clean.startswith("### "):
+            pdf.ln(2)
+            pdf.set_font("Helvetica", size=11, style="B")
+            pdf.cell(0, 6, txt=line_clean[4:], ln=True)
+            pdf.ln(1)
+        # Bullet list items
+        elif line_clean.startswith("- ") or line_clean.startswith("* "):
+            pdf.set_font("Helvetica", size=10)
+            pdf.write(5, "  o  ")
+            _write_formatted_pdf_text(pdf, line_clean[2:])
+        # Numbered list items
+        elif re.match(r'^\d+\.\s+', line_clean):
+            match = re.match(r'^(\d+\.\s+)(.*)', line_clean)
+            pdf.set_font("Helvetica", size=10)
+            pdf.write(5, f"  {match.group(1)}")
+            _write_formatted_pdf_text(pdf, match.group(2))
         else:
-            pdf.multi_cell(0, 6, txt=line_clean)
+            _write_formatted_pdf_text(pdf, line_clean)
+            
+        i += 1
 
     try:
         pdf.output(str(out_path))

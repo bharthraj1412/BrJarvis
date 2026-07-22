@@ -18,6 +18,7 @@ class ActionType(str, enum.Enum):
     CLIPBOARD_SET = "CLIPBOARD_SET"
     CLIPBOARD_GET = "CLIPBOARD_GET"
     APP_FOCUS = "APP_FOCUS"
+    WINDOW_FOCUS = "WINDOW_FOCUS"
 
 
 class ComputerAction(BaseModel):

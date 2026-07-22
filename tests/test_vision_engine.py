@@ -25,7 +25,7 @@ def test_screen_analyst_capture():
 
 def test_ocr_engine():
     ocr = OCREngine()
-    text, elements = ocr.extract_text_and_elements(b"", 1920, 1080)
+    text, elements = ocr.extract_text_and_elements(b"frame_bytes", 1920, 1080)
     assert "Admin" in text
     assert len(elements) > 0
 

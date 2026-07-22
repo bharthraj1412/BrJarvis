@@ -1,0 +1,314 @@
+[
+    {
+        "display_name": "Gemini 3.5 Flash (Low)",
+        "model_id": "gemini-3.5-flash-low",
+        "status_code": 200,
+        "latency": 3.8484742641448975,
+        "response": {
+            "id": "chatcmpl-3a13c121-183e-4019-b81f-ed67ca46fd5f",
+            "object": "chat.completion",
+            "created": 1784705532,
+            "model": "gemini-3.5-flash-low",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello World"
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 89,
+                "completion_tokens": 2,
+                "total_tokens": 91
+            }
+        }
+    },
+    {
+        "display_name": "Claude Opus 4.6 (Thinking)",
+        "model_id": "claude-opus-4-6-thinking",
+        "status_code": 200,
+        "latency": 5.822614669799805,
+        "response": {
+            "id": "chatcmpl-38d81f1a-4a9a-4da7-af39-bd5fb4fa7c9e",
+            "object": "chat.completion",
+            "created": 1784705534,
+            "model": "claude-opus-4-6-thinking",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello World"
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 141,
+                "completion_tokens": 15,
+                "total_tokens": 156
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.6 Flash (Medium)",
+        "model_id": "gemini-3.6-flash-medium",
+        "status_code": 500,
+        "latency": 7.798790693283081,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.5 Flash (High)",
+        "model_id": "gemini-3.5-flash-high",
+        "status_code": 500,
+        "latency": 8.093756914138794,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.6 Flash (Low)",
+        "model_id": "gemini-3.6-flash-low",
+        "status_code": 500,
+        "latency": 8.290975332260132,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "GPT-OSS 120B (Medium)",
+        "model_id": "gpt-oss-120b-medium",
+        "status_code": 200,
+        "latency": 4.5448832511901855,
+        "response": {
+            "id": "chatcmpl-536eebca-fff8-45d8-8999-3b0684d458b4",
+            "object": "chat.completion",
+            "created": 1784705536,
+            "model": "gpt-oss-120b-medium",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello World",
+                        "reasoning_content": "The user wants exactly 'Hello World' and nothing else. Must respond exactly that."
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 161,
+                "completion_tokens": 29,
+                "total_tokens": 190
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.6 Flash (High)",
+        "model_id": "gemini-3.6-flash-high",
+        "status_code": 500,
+        "latency": 8.765796184539795,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.1 Pro (High)",
+        "model_id": "gemini-3.1-pro-high",
+        "status_code": 500,
+        "latency": 8.789377927780151,
+        "response": {
+            "error": {
+                "message": "Request contains an invalid argument.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Claude Sonnet 4.6 (Thinking)",
+        "model_id": "claude-sonnet-4-6-thinking",
+        "status_code": 500,
+        "latency": 9.054192781448364,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.5 Flash (Medium)",
+        "model_id": "gemini-3.5-flash-medium",
+        "status_code": 500,
+        "latency": 10.349294185638428,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.1 Pro (Low)",
+        "model_id": "gemini-3.1-pro-low",
+        "status_code": 200,
+        "latency": 12.17672610282898,
+        "response": {
+            "id": "chatcmpl-84d38ce2-bfa2-43f3-88e7-54e5aaaa8f2c",
+            "object": "chat.completion",
+            "created": 1784705540,
+            "model": "gemini-3.1-pro-low",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello World"
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 89,
+                "completion_tokens": 2,
+                "total_tokens": 91
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.5 Flash Extra Low",
+        "model_id": "gemini-3.5-flash-extra-low",
+        "status_code": 200,
+        "latency": 4.439813137054443,
+        "response": {
+            "id": "chatcmpl-215a5e01-bbfd-4e89-8659-1d2c80e7aeea",
+            "object": "chat.completion",
+            "created": 1784705540,
+            "model": "gemini-3.5-flash-extra-low",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello World"
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 89,
+                "completion_tokens": 2,
+                "total_tokens": 91
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3 Flash Agent",
+        "model_id": "gemini-3-flash-agent",
+        "status_code": 200,
+        "latency": 5.270197629928589,
+        "response": {
+            "id": "chatcmpl-80759a37-7428-4e9d-8488-e594537d9224",
+            "object": "chat.completion",
+            "created": 1784705542,
+            "model": "gemini-3-flash-agent",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello World",
+                        "reasoning_content": "**My Response Generation Strategy**\n\nOkay, here's how I'm approaching this. First, I'm carefully analyzing the user's request: they've explicitly asked for *only* \"Hello World,\" and no other text or explanation. It seems like a simple task, but precision is key here. I'm double-checking to ensure I understand the constraint: I can't deviate even slightly.\n\nNext, I'm running a quick mental checklist to confirm I'm following instructions perfectly. I am verifying that no other text is acceptable and that I am providing the *exact* string \"Hello World\". My confidence level on this is high \u2013 a solid 5 out of 5.\n\nTherefore, the output is perfectly clear: I am simply generating \"Hello World.\"\n\n\n"
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 89,
+                "completion_tokens": 2,
+                "total_tokens": 91
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3 Flash",
+        "model_id": "gemini-3-flash",
+        "status_code": 200,
+        "latency": 5.440154314041138,
+        "response": {
+            "id": "chatcmpl-ac3ff085-05a8-4495-b490-38bde2a88c5b",
+            "object": "chat.completion",
+            "created": 1784705542,
+            "model": "gemini-3-flash",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello World",
+                        "reasoning_content": "**My Immediate Response to the User's Directive**\n\nOkay, so the user wants me to deliver a very specific output: \"Hello World.\" No deviations, no embellishments, nothing but those two words. I need to be precise, absolutely literal. The system prompt is screaming this directive at me, so I need to make sure I don't get sidetracked by any of my usual tendencies towards explanation or context. This is purely about execution. I'm internalizing the constraint: \"exactly 'Hello World' and nothing else.\" No introductions, no farewells, no clever formatting \u2013 just the literal string. My output should, therefore, be \"Hello World\". Done.\n\n\n"
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 89,
+                "completion_tokens": 2,
+                "total_tokens": 91
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.6 Flash Tiered",
+        "model_id": "gemini-3.6-flash-tiered",
+        "status_code": 500,
+        "latency": 8.292651653289795,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Gemini 3.1 Flash Lite",
+        "model_id": "gemini-3.1-flash-lite",
+        "status_code": 500,
+        "latency": 8.251983404159546,
+        "response": {
+            "error": {
+                "message": "* GenerateContentRequest.safety_settings[4]: element predicate failed: $.category in (HarmCategory.HARM_CATEGORY_HATE_SPEECH, HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, HarmCategory.HARM_CATEGORY_HARASSMENT, HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, HarmCategory.HARM_CATEGORY_JAILBREAK)",
+                "type": "server_error"
+            }
+        }
+    },
+    {
+        "display_name": "Claude Sonnet 4.6 (Standard)",
+        "model_id": "claude-sonnet-4-6",
+        "status_code": 500,
+        "latency": 8.211355209350586,
+        "response": {
+            "error": {
+                "message": "Requested entity was not found.",
+                "type": "server_error"
+            }
+        }
+    }
+]

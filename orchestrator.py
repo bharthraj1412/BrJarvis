@@ -340,6 +340,10 @@ class JarvisOrchestrator:
                 )
 
                 clean = re.sub(r'```tool_call\s*\n\s*\{.*?\}\s*\n\s*```', '', response, flags=re.DOTALL).strip()
+                clean = re.sub(r'<\|start\|>.*?<\|call\|>', '', clean, flags=re.DOTALL)
+                clean = re.sub(r'<\|channel\|>.*?<\|call\|>', '', clean, flags=re.DOTALL)
+                clean = re.sub(r'<\|message\|>.*?<\|call\|>', '', clean, flags=re.DOTALL)
+                clean = re.sub(r'<\|.*?\|>', '', clean).strip()
                 if clean:
                     self.working_memory.add("assistant", clean)
 
@@ -347,8 +351,11 @@ class JarvisOrchestrator:
                 continue
 
             else:
-                final_response = response
-                self._record_turn("assistant", response[:5000], backend=profile.value, latency_ms=latency_ms)
+                final_response = re.sub(r'<\|start\|>.*?<\|call\|>', '', response, flags=re.DOTALL)
+                final_response = re.sub(r'<\|channel\|>.*?<\|call\|>', '', final_response, flags=re.DOTALL)
+                final_response = re.sub(r'<\|message\|>.*?<\|call\|>', '', final_response, flags=re.DOTALL)
+                final_response = re.sub(r'<\|.*?\|>', '', final_response).strip()
+                self._record_turn("assistant", final_response[:5000], backend=profile.value, latency_ms=latency_ms)
                 break
 
         else:

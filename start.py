@@ -5,6 +5,8 @@ Production-grade launcher mapping to the complete suite.
 Features Rich TUI for Windows-compatible colorization.
 """
 
+import warnings
+warnings.simplefilter("ignore")
 import importlib
 import json
 import os
@@ -66,13 +68,13 @@ def _banner():
     console.clear()
     now = datetime.now().strftime("%A, %B %d, %Y — %I:%M %p")
     text = Text(justify="center")
-    text.append("\nBR Jarvis  —  SYSTEM CORE\n", style="bold cyan")
-    text.append("Cognitive Neural Assistant\n\n", style="dim")
-    text.append(f"Version: {VERSION} | Build: {BUILD}\n", style="bold green")
-    text.append(f"Python: {sys.version.split()[0]} | Platform: {platform.system()}\n", style="green")
+    text.append("\n⚡ BR JARVIS — AI OPERATING SYSTEM ⚡\n", style="bold cyan")
+    text.append("Cognitive Multi-Modal Neural Assistant & Autonomous OS Controller\n\n", style="dim")
+    text.append(f"Version: {VERSION} | Build: {BUILD} | Codename: {CODENAME}\n", style="bold green")
+    text.append(f"Python: {sys.version.split()[0]} | Platform: {platform.system()} | Guardian: ACTIVE 🛡️\n", style="cyan")
     text.append(now, style="dim")
     
-    panel = Panel(text, border_style="cyan", expand=False, padding=(1, 4))
+    panel = Panel(text, border_style="bold cyan", expand=False, padding=(1, 4))
     console.print(panel)
     console.print()
 
@@ -296,6 +298,8 @@ def doctor(auto_confirm: bool = False):
         "beautifulsoup4": "bs4",
         "playwright": "playwright",
         "youtube-transcript-api": "youtube_transcript_api",
+        "chromadb": "chromadb",
+        "anthropic": "anthropic",
     }
     
     missing_pip: list[tuple[str, str]] = []
@@ -504,6 +508,13 @@ def launch_voice():
     from main import main as voice_main
     _run_script("main.py", voice_main)
 
+def launch_floating_voice():
+    console.print("\n[bold cyan]▶ Starting Floating Gemini Live Voice Overlay[/]")
+    console.print("[dim]Note: The frameless floating pill window will open above all windows.[/]\n")
+    from floating_voice_ui import FloatingGeminiVoiceUI
+    app = FloatingGeminiVoiceUI()
+    app.run()
+
 def launch_cli():
     console.print("\n[bold cyan]▶ Starting CLI Orchestrator[/]")
     console.print("[dim]Type /quit to exit.[/]\n")
@@ -515,6 +526,11 @@ def launch_web_server():
     console.print(f"  [green]Server Running on[/] http://localhost:8000")
     console.print(f"  [green]Dashboard Interface[/] Access [cyan]http://localhost:8000[/]")
     console.print("[dim]Press Ctrl+C to shut down.[/]\n")
+    try:
+        import webbrowser
+        webbrowser.open("http://localhost:8000")
+    except Exception:
+        pass
     from server import main as server_main
     _run_script("server.py", server_main)
 
@@ -604,7 +620,8 @@ def show_audio_status():
         table.add_column("Idx", style="bold cyan")
         table.add_column("Type", style="bold")
         table.add_column("Name")
-        table.add_column("Default")
+        table.add_column("Default Rate", style="dim")
+        table.add_column("Status")
 
         for i, dev in enumerate(devices):
             in_ch = int(dev.get("max_input_channels", 0))
@@ -617,23 +634,45 @@ def show_audio_status():
             if out_ch > 0:
                 kind.append(f"OUT({out_ch})")
             is_default = (i == default_in) or (i == default_out)
-            table.add_row(str(i), " / ".join(kind), str(dev.get("name", "")), "[green]★ Default[/]" if is_default else "")
+            sample_rate = int(dev.get("default_samplerate", 44100))
+            table.add_row(
+                str(i),
+                " / ".join(kind),
+                str(dev.get("name", "")),
+                f"{sample_rate} Hz",
+                "[bold green]★ Default[/]" if is_default else "[dim]Ready[/]"
+            )
 
         console.print(table)
 
         # Test Native Audio Signal RMS energy computation
         try:
             from core.native_bridge import audio_energy
-            sample_signal = [0.05, 0.2, -0.15, 0.4, -0.3, 0.1]
+            sample_signal = [0.05, 0.2, -0.15, 0.4, -0.3, 0.1, 0.5, -0.2]
             rms = audio_energy(sample_signal)
             console.print(f"\n[green]✓ Native C Audio RMS Processor Active:[/] Test Signal RMS Energy = [cyan]{rms:.4f}[/]")
         except Exception:
             pass
 
+        # Live microphone VU Meter test
+        console.print("\n[bold cyan]🎙️ Live Microphone Signal Calibration Check:[/]")
+        try:
+            import numpy as np
+            rec_data = sd.rec(int(0.5 * 16000), samplerate=16000, channels=1, dtype='float32')
+            sd.wait()
+            rms_val = float(np.sqrt(np.mean(rec_data**2)))
+            bars = int(min(20, max(0, rms_val * 100)))
+            meter_bar = "█" * bars + "░" * (20 - bars)
+            console.print(f"  Live Mic Energy Level: [[cyan]{meter_bar}[/]] ({rms_val:.4f})")
+            console.print("  [green]✓ Hardware Microphone Stream Operational[/]")
+        except Exception as mic_err:
+            console.print(f"  [yellow]⚠ Live mic test note: {mic_err}[/]")
+
         console.print("\n[dim]Override audio devices with environment variables:[/]")
         console.print("[dim]  export JARVIS_AUDIO_INPUT_DEVICE=<index-or-name>[/]")
         console.print("[dim]  export JARVIS_AUDIO_OUTPUT_DEVICE=<index-or-name>[/]")
     except Exception as e:
+        console.print(f"[red]✗ Audio diagnostics failed:[/] {e}")
         console.print(f"[red]✗ Audio diagnostics failed:[/] {e}")
 
 def launch_live_os():
@@ -665,25 +704,26 @@ def main():
         _banner()
         _check_env()
         
-        table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column("Num", style="bold cyan")
-        table.add_column("Action", style="bold")
-        table.add_column("Desc", style="dim")
+        table = Table(show_header=True, header_style="bold cyan", box=None, padding=(0, 2))
+        table.add_column("Seq", style="bold cyan", width=5)
+        table.add_column("Module Sequence", style="bold green", width=14)
+        table.add_column("Description & Subsystem Capabilities", style="dim", width=55)
         
-        table.add_row("1", "VOICE", "BR Hands-Free Voice Assistant")
-        table.add_row("2", "CLI", "ReAct Terminal Interface (Multi Backend)")
-        table.add_row("3", "BOTH", "Voice + CLI running simultaneously")
-        table.add_row("4", "WEB CORE", "Launch Central Server and Web Interface")
-        table.add_row("5", "STATUS", "Check AI configuration and module health")
-        table.add_row("6", "DOCTOR", "Auto-install missing dependencies")
-        table.add_row("7", "SMOKE", "Run non-destructive startup checks")
-        table.add_row("8", "AUDIO", "List mic/speaker devices and defaults")
-        table.add_row("9", "LIVE OS", "Autonomous Live OS Visual Control ('Antigravity Mode')")
+        table.add_row("1", "VOICE", "BR Hands-Free Voice Assistant (PySide GUI + Whisper ASR)")
+        table.add_row("2", "CLI", "ReAct Terminal Orchestrator (Multi-LLM & Skills)")
+        table.add_row("3", "BOTH", "Dual Execution: Voice Assistant + CLI Orchestrator")
+        table.add_row("4", "WEB CORE", "Launch Glassmorphic Web Server & PWA Dashboard")
+        table.add_row("5", "STATUS", "Subsystem Diagnostic Matrix & Backend Connectivity")
+        table.add_row("6", "DOCTOR", "Auto-Install & Repair Python & System Dependencies")
+        table.add_row("7", "SMOKE", "Run 10-Point Non-Destructive Startup Sanity Verification")
+        table.add_row("8", "AUDIO", "Audio Hardware Meter & Native C RMS Signal Diagnostics")
+        table.add_row("9", "LIVE OS", "Autonomous Visual Computer Control ('Antigravity Mode')")
+        table.add_row("10", "FLOATING", "Frameless Glassmorphic Floating Live Voice Widget")
         
-        console.print(Panel(table, title="[bold]Select Module Sequence[/]", expand=False))
+        console.print(Panel(table, title="[bold cyan]◈ SELECT MODULE SEQUENCE ◈[/]", border_style="cyan", expand=False))
         console.print()
         
-        choice = Prompt.ask("  [cyan]❯[/] Ready", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9"], default="1")
+        choice = Prompt.ask("  [bold cyan]❯ Ready[/]", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"], default="1")
         mode = {
             "1": "voice",
             "2": "cli",
@@ -694,9 +734,11 @@ def main():
             "7": "smoke",
             "8": "audio",
             "9": "live",
+            "10": "floating",
         }[choice]
 
     if mode in ("voice", "v", "gui"): launch_voice() if _pre_launch_check() else None
+    elif mode in ("floating", "float", "overlay"): launch_floating_voice()
     elif mode in ("cli", "c", "terminal"): launch_cli() if _pre_launch_check() else None
     elif mode in ("both", "b", "all"): launch_both() if _pre_launch_check() else None
     elif mode in ("webserver", "web", "server"): launch_web_server()

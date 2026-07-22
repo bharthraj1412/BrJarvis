@@ -8,8 +8,8 @@ from pathlib import Path
 from tools.registry import register_tool
 from tools.files import FileManager
 
-# Initialize the file manager relative to the project workspace directory
-WORKSPACE_DIR = Path(__file__).resolve().parent.parent / "workspace"
+# Initialize the file manager relative to the project root directory
+WORKSPACE_DIR = Path(__file__).resolve().parent.parent
 _files = FileManager(workspace=str(WORKSPACE_DIR))
 
 

@@ -5,6 +5,8 @@ Hands-free voice assistant utilizing centralized voice packages.
 """
 from __future__ import annotations
 
+import warnings
+warnings.simplefilter("ignore")
 import asyncio
 import os
 import sys

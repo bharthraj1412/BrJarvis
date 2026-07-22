@@ -16,12 +16,13 @@ from enum import Enum
 
 
 class AgentProfile(Enum):
-    GEMINI  = "gemini"
-    CLAUDE  = "claude"
-    GPT     = "gpt"
-    OLLAMA  = "ollama"
-    NVIDIA  = "nvidia"
-    MISTRAL = "mistral"
+    GEMINI   = "gemini"
+    CLAUDE   = "claude"
+    GPT      = "gpt"
+    DEEPSEEK = "deepseek"
+    OLLAMA   = "ollama"
+    NVIDIA   = "nvidia"
+    MISTRAL  = "mistral"
 
 
 # Intelligent routing — route tasks to the best backend when available
@@ -90,6 +91,17 @@ def load_available_backends() -> dict:
                 _print_ok(f"GPT — {b.model_name}")
         except Exception as e:
             _print_skip(f"GPT: {e}")
+
+    # ── DeepSeek (optional) ──────────────────────────────────────────────
+    if os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENROUTER_API_KEY"):
+        try:
+            from backends.deepseek import DeepSeekBackend
+            b = DeepSeekBackend()
+            if b.client:
+                backends[AgentProfile.DEEPSEEK] = b
+                _print_ok(f"DeepSeek — {b.model_name}")
+        except Exception as e:
+            _print_skip(f"DeepSeek: {e}")
 
     # ── Ollama (optional — local) ────────────────────────────────────────
     try:

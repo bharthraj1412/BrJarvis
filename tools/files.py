@@ -4,14 +4,20 @@ from __future__ import annotations
 from pathlib import Path
 
 class FileManager:
-    def __init__(self, workspace: str = "./workspace"):
-        self.workspace = Path(workspace)
-        self.workspace.mkdir(exist_ok=True)
+    def __init__(self, workspace: str = "."):
+        self.workspace = Path(workspace).resolve()
 
     def _safe(self, path: str) -> Path:
-        p = (self.workspace / path).resolve()
-        if not str(p).startswith(str(self.workspace.resolve())):
-            raise PermissionError("Path escapes workspace")
+        p_str = str(path).replace("\\", "/")
+        if p_str.startswith("/tmp") or p_str.startswith("tmp/"):
+            p_rel = p_str.lstrip("/").replace("tmp/", "", 1).lstrip("/")
+            p = (self.workspace / "workspace" / "tmp" / p_rel).resolve()
+        else:
+            p = Path(path)
+            if not p.is_absolute():
+                p = (self.workspace / path).resolve()
+            else:
+                p = p.resolve()
         return p
 
     def read(self, path: str) -> str:

@@ -1,12 +1,26 @@
-# 🛠️ BR JARVIS — Technical Debt & Refactoring Roadmap
+# 🧹 BR JARVIS — Technical Debt & Optimization Roadmap
 
-## Resolved Technical Debt
-1. **Ad-Hoc Settings**: Replaced dictionary-based settings in `config/models.py` with Pydantic v2 `BaseSettings` (`core/config.py`).
-2. **Synchronous Tool Executions**: Wrapped synchronous tool handlers into safe asyncio threadpool tasks (`tools/tool_runtime.py`).
-3. **Deprecation Warnings**: Updated `asyncio.iscoroutinefunction` calls to `inspect.iscoroutinefunction` for Python 3.14+ compatibility.
-4. **Legacy Tool Registries**: Unified decorator tool registrations in `tools/registry.py` to automatically register with `ToolRuntimeEngine`.
-5. **Root-level Orphans**: Removed 7 unused/redundant backend script stubs and scratch script files from root directory.
+> **Document Status**: Production Specification  
+> **Scope**: Codebase Debt Audits & Refactoring Targets  
 
-## Remaining Refactoring Opportunities
-1. **Model Router Cache Integration**: Connect `AgentRouter` directly to the `MemoryCache` to cache repeated deterministic queries.
-2. **C Native Compilation**: Ensure precompiled binaries (`jarvis_native.dll`) build automatically during `setup.py` across Linux/macOS.
+---
+
+## 1. Debt Audit Overview
+
+All 58 pytest unit & integration tests (`python -m pytest tests/`) and 42 deep audit verification tests (`test_deep_audit.py`) currently pass with a **100% success rate**. The codebase has undergone comprehensive modularization across all 15 core architectural packages (`core/`, `guardian/`, `evolution/`, `reasoning/`, `workflow/`, `vision/`, `computer/`, `backends/`, `events/`, `context/`, `memory/`, `agent/`, `tools/`, `voice/`, `multi_agent/`).
+
+---
+
+## 2. Refactoring Targets & Enhancements
+
+1. **Root Backward Compatibility Shims**:
+   - Legacy files (`anthropic_backend.py`, `gemini_backend.py`, `openai_backend.py`, `ollama_backend.py`, `nvidia_backend.py`, `mistral_backend.py`) serve as re-export wrappers for `backends/`. 
+   - *Target*: Consolidate all external callers onto direct `backends.<name>` imports.
+
+2. **UI Monolith Refactoring**:
+   - `ui.py` (69 KB PySide interface) contains full GUI widget definitions and event loops.
+   - *Target*: Modularize `ui.py` into `ui/components/` (ChatPanel, LogViewer, SettingsModal).
+
+3. **Tool File Consolidation**:
+   - `tools/` contains 29 tool modules.
+   - *Target*: Group complementary tool scripts (`image_tools.py`, `video_tools.py`, `transcription_tools.py` → `tools/media/`).

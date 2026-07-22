@@ -244,12 +244,18 @@ def _register_builtins() -> None:
         prompt=_WEB_RESEARCH_PROMPT,
         file_path="<builtin>",
         when_to_use="Use when the user wants comprehensive research on a topic.",
-        argument_hint="<topic to research>",
         arguments=[],
         user_invocable=True,
         context="inline",
         source="builtin",
     ))
+
+    try:
+        from skills.builtin_connectors import load_builtin_connector_skills
+        for c_skill in load_builtin_connector_skills():
+            register_builtin_skill(c_skill)
+    except Exception as ex:
+        print(f"[Skills] Warning loading connector skills: {ex}")
 
 
 _register_builtins()

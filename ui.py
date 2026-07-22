@@ -41,42 +41,42 @@ MODEL_BADGE = "BR NEURAL CORE v6.0 — Colorful Glossy Glass OS"
 
 # ── Colorful Glossy Color Palette ─────────────────────────────────────────────
 C = {
-    "bg":         "#06090e",      # Deep dark space base
-    "bg_trans":   "#0b1018",      # Glass backdrop
-    "surface":    "#111722",      # Frosted glass panel
-    "card":       "#17202f",      # Card surface
-    "card_h":     "#202b3f",      # Card hover
-    "card_glow":  "#2d3d59",      # Card border glow
+    "bg":         "#050608",      # Deep dark space base
+    "bg_trans":   "#090b10",      # Glass backdrop
+    "surface":    "#0e111a",      # Frosted glass panel
+    "card":       "#141824",      # Card surface
+    "card_h":     "#1b2030",      # Card hover
+    "card_glow":  "#242c40",      # Card border glow
 
-    "border":     "#263449",      # Standard border
-    "border_glow":"#00e5ff",      # Focused border glow
-    "border_s":   "#1a2536",      # Subtle border
+    "border":     "#1f293d",      # Standard border
+    "border_glow":"#00f2fe",      # Focused border glow
+    "border_s":   "#161f30",      # Subtle border
 
-    "accent":     "#0088ff",      # Electric Blue
-    "accent_l":   "#40a9ff",      # Light Blue
+    "accent":     "#0070f3",      # Electric Blue
+    "accent_l":   "#00f2fe",      # Light Cyan
     "cyan":       "#00f2fe",      # Neon Cyan
-    "purple":     "#bf5af2",      # Neon Purple
-    "pink":       "#ff2d55",      # Neon Pink
-    "green":      "#30d158",      # Neon Green
-    "amber":      "#ff9f0a",      # Neon Amber
+    "purple":     "#7928ca",      # Deep Purple
+    "pink":       "#ff007f",      # Neon Pink
+    "green":      "#00e676",      # Neon Green
+    "amber":      "#ffab00",      # Neon Amber
     "magenta":    "#ff007f",      # Neon Magenta
 
     "t1":         "#ffffff",      # High-contrast white
-    "t2":         "#e1e7f0",      # Bright text
-    "t3":         "#94a3b8",      # Secondary text
+    "t2":         "#f0f4f8",      # Bright text
+    "t3":         "#8b949e",      # Secondary text
     "t4":         "#64748b",      # Muted text
     "t5":         "#334155",      # Dim text
 
-    "ok":         "#30d158",
-    "warn":       "#ff9f0a",
-    "err":        "#ff453a",
-    "info":       "#64d2ff",
+    "ok":         "#00e676",
+    "warn":       "#ffab00",
+    "err":        "#ff1744",
+    "info":       "#00f2fe",
 
-    "st_listen":  "#30d158",
+    "st_listen":  "#00e676",
     "st_speak":   "#00f2fe",
-    "st_think":   "#bf5af2",
-    "st_mute":    "#ff453a",
-    "st_proc":    "#ff9f0a",
+    "st_think":   "#7928ca",
+    "st_mute":    "#ff1744",
+    "st_proc":    "#ffab00",
 }
 
 # 12 Multi-Color Integration Specs (Icon, Label, Action, Accent Color, Glass BG, Gloss Glow)
@@ -236,7 +236,7 @@ class JarvisUI:
         self.root.bind("<Control-Shift-c>", lambda e: self._show_max_control_panel())
         self.root.bind("<Escape>", lambda e: self._input_entry.focus_set() if not self._is_sleeping else self._switch_mode("FULL"))
         self.root.bind("<Control-l>", lambda e: self._clear_log())
-        self.root.bind("<Control-k>", lambda e: self._input_entry.focus_set())
+        self.root.bind("<Control-k>", lambda e: self._show_command_palette_modal())
 
         self._api_key_ready = self._api_keys_exist()
         if not self._api_key_ready:
@@ -1213,6 +1213,84 @@ class JarvisUI:
     # ══════════════════════════════════════════════════════════════════════
     # ── Helpers & Public API ──────────────────────────────────────────────
     # ══════════════════════════════════════════════════════════════════════
+
+    def _show_command_palette_modal(self):
+        """Open high-speed Ctrl+K Command Palette Modal."""
+        pop = tk.Toplevel(self.root)
+        pop.title("JARVIS — Quick Command Palette (Ctrl+K)")
+        pop.geometry("560x320")
+        pop.configure(bg=C["bg"])
+        pop.transient(self.root)
+        pop.grab_set()
+
+        hdr = tk.Frame(pop, bg=C["surface"], padx=14, pady=10)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="🔍 COMMAND PALETTE", fg=C["cyan"], bg=C["surface"], font=F["ui_b"]).pack(side="left")
+        tk.Label(hdr, text="Press Esc to exit", fg=C["t4"], bg=C["surface"], font=F["ui_xs"]).pack(side="right")
+
+        body = tk.Frame(pop, bg=C["bg"], padx=14, pady=12)
+        body.pack(fill="both", expand=True)
+
+        entry_var = tk.StringVar()
+        ent = tk.Entry(body, textvariable=entry_var, fg=C["t1"], bg=C["card"], insertbackground=C["cyan"], font=F["mono"], borderwidth=1, relief="solid")
+        ent.pack(fill="x", pady=(0, 10))
+        ent.focus_set()
+
+        listbox = tk.Listbox(body, fg=C["t2"], bg=C["card"], selectbackground=C["accent"], selectforeground="#ffffff", borderwidth=0, font=F["ui_sm"])
+        listbox.pack(fill="both", expand=True)
+
+        cmds = [
+            "💬 Open Cognitive Dialogue Workspace",
+            "📊 Run Excel Project Analysis Report",
+            "⚡ Switch Model Backend to Gemini 3.5 Flash",
+            "💻 Switch Role Persona to Senior Coder",
+            "🛡️ Check Guardian Integrity Status",
+            "🎙️ Toggle Live Voice Recording",
+        ]
+        for c in cmds:
+            listbox.insert(tk.END, c)
+
+        def _exec(event=None):
+            sel = listbox.curselection()
+            if sel:
+                item = listbox.get(sel[0])
+                self.write_log(f"SYS: Palette executed '{item}'")
+                if "Excel" in item:
+                    self._on_input_submit_text("excel project analysis")
+                elif "Voice" in item:
+                    self._toggle_mute()
+            pop.destroy()
+
+        ent.bind("<Return>", _exec)
+        listbox.bind("<Double-Button-1>", _exec)
+        pop.bind("<Escape>", lambda e: pop.destroy())
+
+    def _show_screen_cast_modal(self):
+        """Open Screen Share / Recording Permission Modal."""
+        pop = tk.Toplevel(self.root)
+        pop.title("Share screen with Live — BR JARVIS")
+        pop.geometry("420x240")
+        pop.configure(bg=C["bg"])
+        pop.transient(self.root)
+        pop.grab_set()
+
+        body = tk.Frame(pop, bg=C["surface"], padx=20, pady=18)
+        body.pack(fill="both", expand=True)
+
+        tk.Label(body, text="📺 Start recording or casting with BR JARVIS?", fg=C["t1"], bg=C["surface"], font=F["ui_lg"]).pack(anchor="w", pady=(0, 10))
+
+        cast_var = tk.StringVar(value="Entire screen")
+        om = ttk.OptionMenu(body, cast_var, "Entire screen", "Entire screen", "Active Window")
+        om.pack(fill="x", pady=(0, 10))
+
+        warn = "While sharing, recording, or casting, BR JARVIS can capture any information displayed on screen. Be mindful of passwords and sensitive data."
+        tk.Label(body, text=warn, fg=C["t3"], bg=C["surface"], font=F["ui_xs"], wraplength=380, justify="left").pack(anchor="w", pady=(0, 14))
+
+        btn_row = tk.Frame(body, bg=C["surface"])
+        btn_row.pack(fill="x")
+        tk.Button(btn_row, text="Cancel", command=pop.destroy, bg=C["card"], fg=C["t2"], font=F["ui_sm"], padx=12, pady=4).pack(side="right", padx=(6, 0))
+        tk.Button(btn_row, text="Cast", command=lambda: (self.write_log("SYS: Screen cast initialized"), pop.destroy()), bg=C["accent"], fg="#ffffff", font=F["ui_b"], padx=16, pady=4).pack(side="right")
+
 
     def _send_clipboard(self):
         try:

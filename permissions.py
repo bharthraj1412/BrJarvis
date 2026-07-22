@@ -129,3 +129,50 @@ def check_permission(tool_name: str, args: dict | None = None) -> bool:
     """Check if tool execution is permitted under global policy."""
     return PERMISSIONS.check(tool_name)
 
+
+# ── Path Policy & Tiered File Access ────────────────────────────────────────
+
+class PathTier(Enum):
+    TIER_0_WORKSPACE = 0
+    TIER_1_USER_PROFILE = 1
+    TIER_2_CRITICAL_SECRETS = 2
+
+
+TIER_2_PATTERNS = frozenset({
+    "system32", "winsxs", "registry", "sam", "system", "security",
+    "login data", ".ssh", ".gnupg", "id_rsa", "id_ed25519", "wallet",
+    ".pem", ".key", ".pfx", "shadow", "passwd"
+})
+
+
+class PathPolicy:
+    """Evaluates file paths against Tier 0 (Workspace), Tier 1 (Profile), Tier 2 (Critical/Secrets)."""
+
+    @classmethod
+    def get_tier(cls, path_input: str | Path) -> PathTier:
+        p_str = str(path_input).lower().replace("\\", "/")
+        
+        # Check Tier 2 Critical / Secrets
+        if any(pat in p_str for pat in TIER_2_PATTERNS) or p_str.endswith((".pem", ".key", ".pfx")):
+            return PathTier.TIER_2_CRITICAL_SECRETS
+
+        # Check Tier 0 Workspace
+        workspace_root = str(Path(".").resolve()).lower().replace("\\", "/")
+        if p_str.startswith(workspace_root) or "br_workspace" in p_str or "documents/projects" in p_str:
+            return PathTier.TIER_0_WORKSPACE
+
+        # Default to Tier 1 User Profile
+        return PathTier.TIER_1_USER_PROFILE
+
+    @classmethod
+    def allow_cloud_context(cls, path_input: str | Path) -> bool:
+        """Return True if path is safe to send to cloud LLMs (Tier 0 or Tier 1). Return False for Tier 2."""
+        tier = cls.get_tier(path_input)
+        return tier != PathTier.TIER_2_CRITICAL_SECRETS
+
+
+def cloud_context_exclusion_check(path_input: str | Path) -> bool:
+    """Helper function to verify if file path is permitted in cloud prompt payload."""
+    return PathPolicy.allow_cloud_context(path_input)
+
+

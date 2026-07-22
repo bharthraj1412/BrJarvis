@@ -73,7 +73,9 @@ class BRVoiceAssistant:
             asyncio.run_coroutine_threadsafe(self.process_command(text), self._loop)
 
     def speak(self, text: str):
-        """Speak text using the neural TTS engine with UI state sync."""
+        """Speak text using the neural TTS engine with UI state sync & barge-in support."""
+        if self.tts.is_speaking:
+            self.tts.stop()
         print(f"[JARVIS] 🗣 Speak: {text}")
 
         def on_start():
@@ -230,7 +232,17 @@ class BRVoiceAssistant:
 
         # Detect multiple parallel goals
         parallel_keywords = ["while also", "at the same time", "simultaneously", "and also"]
-        is_parallel = "|" in text_clean or any(kw in low for kw in parallel_keywords)
+        
+        # Don't treat | in markdown tables as goal separators
+        is_table = False
+        if "|" in text_clean:
+            for line in text_clean.splitlines():
+                line_s = line.strip()
+                if (line_s.startswith("|") and line_s.endswith("|") and len(line_s) > 1) or "|---" in line_s or "--|" in line_s:
+                    is_table = True
+                    break
+        
+        is_parallel = ("|" in text_clean and not is_table) or any(kw in low for kw in parallel_keywords)
 
         if is_parallel:
             goals = []
@@ -425,6 +437,11 @@ class BRVoiceAssistant:
                     except sr.WaitTimeoutError:
                         # Expected timeout when silence, continue loop
                         pass
+                    except RuntimeError as e:
+                        if "shutdown" in str(e).lower() or "closed" in str(e).lower():
+                            break
+                        print(f"[Voice Loop Error]: {e}")
+                        await asyncio.sleep(0.5)
                     except Exception as e:
                         print(f"[Voice Loop Error]: {e}")
                         await asyncio.sleep(0.5)

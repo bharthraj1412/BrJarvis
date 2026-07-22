@@ -2,6 +2,20 @@
 
 ```
 BrJarvis/
+├── guardian/                    # Guardian Safety & Recovery Core
+│   ├── core.py                  # Master Guardian core, SHA-256 integrity & kill switch check
+│   ├── kill_switch.py           # Pause/Resume execution state controller
+│   ├── snapshot.py              # Pre-upgrade SnapshotManager backup & checksum validator
+│   ├── rollback.py              # Automated RollbackEngine state recovery
+│   └── audit_log.py             # Autonomy audit log persistence
+│
+├── evolution/                   # Autonomous Self-Upgrade Engine
+│   ├── classifier.py            # Blast-radius ChangeClassifier (LOW, MEDIUM, HIGH, CRITICAL)
+│   ├── proposer.py              # Automated PatchProposer generator
+│   ├── sandbox.py               # SandboxRunner execution & isolation validator
+│   ├── digest.py                # Architectural ChangeDigest reporter
+│   └── deployer.py              # AutoDeployer deployment pipeline
+│
 ├── core/                        # Core Runtime Engine Coordinator & Services
 │   ├── bootstrap.py             # System bootstrap & AssistantRuntime backward compatibility
 │   ├── config.py                # Pydantic v2 structured settings (JarvisConfig)

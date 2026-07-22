@@ -116,8 +116,17 @@ def audio_energy(samples: list[float] | tuple[float, ...]) -> float:
         except Exception:
             pass
     # Pure Python fallback
-    sum_sq = sum(s * s for s in samples)
-    return math.sqrt(sum_sq / len(samples))
+    try:
+        sum_sq = sum(s * s for s in samples)
+        return math.sqrt(sum_sq / len(samples))
+    except OverflowError:
+        # Safeguard: handle float overflow by scaling down values before computation
+        max_val = max(abs(s) for s in samples)
+        if max_val == 0.0:
+            return 0.0
+        scaled_samples = [s / max_val for s in samples]
+        sum_sq_scaled = sum(s * s for s in scaled_samples)
+        return max_val * math.sqrt(sum_sq_scaled / len(samples))
 
 
 def grid_transform(x_norm: int, y_norm: int, screen_w: int, screen_h: int) -> tuple[int, int]:

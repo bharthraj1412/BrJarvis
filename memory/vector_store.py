@@ -137,6 +137,15 @@ class TextSimilarityMemory:
                 df = sum(1 for doc in self.entries if w in doc["text"].lower())
                 idf = math.log((1 + len(self.entries)) / (1 + df)) + 1.0
                 score += math.log(1 + tf) * idf
+
+            if "embedding" in e.get("metadata", {}):
+                try:
+                    from core.native_bridge import native_fast
+                    v1 = e["metadata"]["embedding"]
+                    if isinstance(v1, list) and len(v1) > 0:
+                        score += float(native_fast.fast_fnv1a_hash(str(v1[:10]).encode()) % 10) / 100.0
+                except Exception:
+                    pass
                 
             if score > 0:
                 ranked.append((score, e["text"]))

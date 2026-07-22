@@ -178,13 +178,36 @@ def open_app(
     if not app_name:
         return "No application name provided."
 
+    target_url = (parameters or {}).get("url", "").strip()
+    if not target_url:
+        low_app = app_name.lower()
+        if "youtube" in low_app:
+            target_url = "https://www.youtube.com"
+        elif "github" in low_app:
+            target_url = "https://github.com"
+        elif " google.com" in low_app or "google search" in low_app:
+            target_url = "https://www.google.com"
+
     normalized = _normalize(app_name)
-    print(f"[open_app] Launching: '{app_name}' → '{normalized}' ({_OS})")
+    print(f"[open_app] Launching: '{app_name}' → '{normalized}' (URL: '{target_url}') ({_OS})")
 
     if player:
         player.write_log(f"[open_app] {app_name}")
 
     try:
+        if target_url:
+            import webbrowser
+            if _OS == "Windows":
+                try:
+                    subprocess.Popen(f'start chrome "{target_url}"', shell=True)
+                    return f"Opened Chrome to {target_url}."
+                except Exception:
+                    webbrowser.open(target_url)
+                    return f"Opened {target_url} in browser."
+            else:
+                webbrowser.open(target_url)
+                return f"Opened {target_url} in default browser."
+
         if _OS == "Linux":
             if _launch_linux(normalized) or _launch_linux(app_name):
                 return f"Opened {app_name}."

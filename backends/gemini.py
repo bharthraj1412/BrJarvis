@@ -55,9 +55,35 @@ class GeminiBackend(BaseBackend):
     ]
 
     def __init__(self, model: str = None, api_key: str = None):
-        self.api_key = api_key or _load_api_key()
-        self.model   = model or self._pick_model()
+        self._use_openai_client = False
         self._client = None
+
+        # Check if local proxy gateway should be used (default: True)
+        use_proxy = os.environ.get("JARVIS_ROUTE_GEMINI_TO_GATEWAY", "true").lower() == "true"
+        if use_proxy:
+            try:
+                from openai import OpenAI
+                from config.models import get_model_config
+                cfg = get_model_config()
+                base_url = cfg.get("openai_base_url", "http://localhost:8045/v1")
+                api_key_val = os.environ.get("OPENAI_API_KEY", "sk-5ec70bf9fa324084b7a7326babf52c45").strip()
+                self._client = OpenAI(base_url=base_url, api_key=api_key_val)
+                self._use_openai_client = True
+                self.model = model or self._pick_model()
+                print(f"[Gemini] Routed via local proxy gateway: {base_url} (model: {self.model})")
+                return
+            except Exception as e:
+                print(f"[Gemini] Failed to initialize local proxy client: {e}. Falling back to direct Google client.")
+
+        # Standard direct Google fallback
+        try:
+            self.api_key = api_key or _load_api_key()
+        except ValueError as e:
+            raise e
+
+        self.model = model or self._pick_model()
+        from google import genai
+        self._client = genai.Client(api_key=self.api_key)
         print(f"[Gemini] [OK] Using model: {self.model}")
 
     @property
@@ -81,15 +107,38 @@ class GeminiBackend(BaseBackend):
 
     @property
     def client(self):
-        if self._client is None:
-            from google import genai
-            self._client = genai.Client(api_key=self.api_key)
         return self._client
 
     def complete(self, messages: list, system: str = "", tools: list = None) -> str:
         """Standard completion — used by the ReAct orchestrator."""
-        contents = []
+        if self._use_openai_client:
+            full_messages = []
+            if system:
+                full_messages.append({"role": "system", "content": system})
+            for msg in messages:
+                role = "user" if msg["role"] == "user" else "assistant"
+                full_messages.append({"role": role, "content": msg.get("content", "")})
+            try:
+                response = self._client.chat.completions.create(
+                    model=self.model,
+                    messages=full_messages,
+                )
+                return response.choices[0].message.content or ""
+            except Exception as e:
+                print(f"[Gemini Proxy] Model {self.model} failed: {e} — trying fallbacks...")
+                for fallback in self.FALLBACK_MODELS:
+                    try:
+                        response = self._client.chat.completions.create(
+                            model=fallback,
+                            messages=full_messages,
+                        )
+                        return response.choices[0].message.content or ""
+                    except Exception:
+                        pass
+                raise e
 
+        # Direct Google client path
+        contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
             content = msg.get("content", "")
@@ -122,6 +171,28 @@ class GeminiBackend(BaseBackend):
 
     def stream(self, messages: list, system: str = "") -> Generator[str, None, None]:
         """Streaming completion."""
+        if self._use_openai_client:
+            full_messages = []
+            if system:
+                full_messages.append({"role": "system", "content": system})
+            for msg in messages:
+                role = "user" if msg["role"] == "user" else "assistant"
+                full_messages.append({"role": role, "content": msg.get("content", "")})
+            try:
+                stream_res = self._client.chat.completions.create(
+                    model=self.model,
+                    messages=full_messages,
+                    stream=True
+                )
+                for chunk in stream_res:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+                return
+            except Exception as e:
+                yield f"\n[Gemini Proxy Stream Error: {e}]"
+                return
+
+        # Direct Google client path
         contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
@@ -146,6 +217,10 @@ class GeminiBackend(BaseBackend):
 
     def complete_with_search(self, query: str, system: str = "") -> str:
         """Completion with Google Search grounding (real-time web data)."""
+        if self._use_openai_client:
+            return self.complete([{"role": "user", "content": query}], system)
+
+        # Direct path
         try:
             config = {"tools": [{"google_search": {}}]}
             if system:
@@ -163,6 +238,29 @@ class GeminiBackend(BaseBackend):
 
     def complete_with_vision(self, image_bytes: bytes, mime_type: str, prompt: str) -> str:
         """Vision completion — analyze an image."""
+        if self._use_openai_client:
+            import base64
+            try:
+                b64 = base64.b64encode(image_bytes).decode("ascii")
+                data_url = f"data:{mime_type};base64,{b64}"
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": data_url}},
+                        ]
+                    }
+                ]
+                response = self._client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                )
+                return response.choices[0].message.content or ""
+            except Exception as e:
+                return f"Vision error: {e}"
+
+        # Direct path
         import base64
         try:
             b64 = base64.b64encode(image_bytes).decode("ascii")
@@ -183,6 +281,21 @@ class GeminiBackend(BaseBackend):
 
     def transcribe(self, audio_bytes: bytes, mime_type: str = "audio/wav") -> str:
         """Transcribe audio bytes using Gemini."""
+        if self._use_openai_client:
+            try:
+                import io
+                audio_file = io.BytesIO(audio_bytes)
+                audio_file.name = "audio.wav"
+                response = self._client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file
+                )
+                return (response.text or "").strip()
+            except Exception as e:
+                print(f"[Gemini Proxy] Transcription failed: {e}")
+                return ""
+
+        # Direct path
         import base64
         try:
             b64 = base64.b64encode(audio_bytes).decode("ascii")

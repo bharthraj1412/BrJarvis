@@ -29,6 +29,26 @@ class ContextBuilder:
         self._items.append(item)
         return self
 
+    def add_lessons(self, query: str, priority: int = 6, limit: int = 3) -> ContextBuilder:
+        """Retrieve and add relevant lessons learned from past corrections at Priority 6."""
+        try:
+            from memory.lessons import LessonStore
+            ls = LessonStore()
+            lessons = ls.get_relevant_lessons(query=query, limit=limit)
+            if lessons:
+                lines = [f"- {l['topic']}: {l['correction']}" for l in lessons]
+                content = "Past User Corrections & Guidelines:\n" + "\n".join(lines)
+                item = ContextItem(
+                    scope=ContextScope.LESSONS,
+                    title="Lessons Learned & User Corrections",
+                    content=content,
+                    priority=priority,
+                )
+                self.add_item(item)
+        except Exception as e:
+            logger.warning(f"Failed to load lessons context: {e}")
+        return self
+
     def assemble(self) -> AssembledContext:
         """Assemble items sorted by priority within available token budget."""
         available_budget = self.budget.available_context_tokens

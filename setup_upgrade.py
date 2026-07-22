@@ -18,6 +18,17 @@ import shutil
 import subprocess
 from pathlib import Path
 
+# Fix terminal encoding issues on Windows
+if sys.platform == "win32":
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # ── The upgraded files to copy ─────────────────────────────────────────────
 UPGRADE_DIR = Path(__file__).parent
 TARGET_DIR = None
@@ -71,8 +82,7 @@ REQUIRED_PACKAGES = [
     "duckduckgo-search",
 ]
 
-ENV_TEMPLATE = """\
-# JARVIS MK37 Environment Configuration
+ENV_TEMPLATE = """# JARVIS MK37 Environment Configuration
 # Only GEMINI_API_KEY is required — all others are optional
 
 # ── REQUIRED ───────────────────────────────────────────────
@@ -92,11 +102,11 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 
 def print_step(msg: str):
-    print(f"\n  ✦ {msg}")
+    print(f"\n  * {msg}")
 
 
 def print_ok(msg: str):
-    print(f"    [✓] {msg}")
+    print(f"    [OK] {msg}")
 
 
 def print_warn(msg: str):

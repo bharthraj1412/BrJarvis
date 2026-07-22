@@ -78,12 +78,47 @@ def main() -> int:
         assert isinstance(payload, dict)
         assert isinstance(payload.get("permissions", {}), dict)
 
+    def check_app_connectors_suite():
+        from tools.app_connectors import gmail_list_unread, notion_search_pages, github_list_prs
+        assert callable(gmail_list_unread)
+        assert callable(notion_search_pages)
+        assert callable(github_list_prs)
+
+    def check_deepseek_backend_connector():
+        from backends.deepseek import DeepSeekBackend
+        ds = DeepSeekBackend(api_key="test_key_dummy")
+        assert ds.model_name in ("deepseek-chat", "deepseek/deepseek-r1")
+
+    def check_native_c_acceleration():
+        from core.native_bridge import get_status, audio_energy
+        st = get_status()
+        assert "active" in st
+        rms = audio_energy([0.1, 0.2, -0.1])
+        assert rms >= 0.0
+
+    def check_pwa_assets():
+        manifest = root / "web" / "manifest.json"
+        sw = root / "web" / "sw.js"
+        assert manifest.exists(), "web/manifest.json missing"
+        assert sw.exists(), "web/sw.js missing"
+
+    def check_di_container():
+        from core.di import Container
+        c = Container()
+        c.register_instance(str, "test_val")
+        assert c.resolve(str) == "test_val"
+
     checks = [
         ("permissions module", check_permissions_module),
         ("router empty backend behavior", check_router_empty_backend_behavior),
         ("skills registry", check_skills_registry),
         ("tools registry", check_tools_registry),
         ("scope file format", check_scope_json_format),
+        ("app connectors suite", check_app_connectors_suite),
+        ("deepseek backend connector", check_deepseek_backend_connector),
+        ("native C acceleration bridge", check_native_c_acceleration),
+        ("pwa manifest & service worker", check_pwa_assets),
+        ("di container & runtime", check_di_container),
     ]
 
     for name, fn in checks:

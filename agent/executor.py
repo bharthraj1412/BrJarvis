@@ -31,19 +31,39 @@ def _call_tool(tool: str, parameters: dict, speak: Callable | None = None) -> st
     """Dispatch a tool call utilizing the centralized tool registry."""
     from tools.registry import execute_tool
     
-    # Handle special fallbacks
-    if tool in ("generated_code", "web_search_fallback"):
+    params = dict(parameters or {})
+    
+    # Handle planner tool name & parameter aliases for real physical execution
+    if tool in ("browser_control", "open_browser", "web_browser"):
+        tool = "open_app"
+        url = params.get("url") or params.get("query") or params.get("app_name") or ""
+        params = {"app_name": f"chrome {url}".strip() if url else "chrome"}
+    elif tool in ("computer_control", "system_control", "desktop_type"):
+        tool = "computer_settings"
+        text = params.get("text") or params.get("value") or params.get("description") or ""
+        act = params.get("action", "type_text")
+        if act in ("type", "write", "type_text", "write_text"):
+            act = "type_text"
+        params = {"action": act, "value": text}
+    elif tool in ("file_controller", "file_manager"):
+        act = params.get("action", "write")
+        if act in ("create", "write", "create_file"):
+            tool = "file_write"
+            params = {"path": params.get("name") or params.get("path") or "file.txt", "content": params.get("content", "")}
+        elif act in ("list", "dir", "ls"):
+            tool = "file_list"
+            params = {"path": params.get("path", ".")}
+    elif tool in ("generated_code", "web_search_fallback"):
         tool = "web_search"
-        parameters = {"query": parameters.get("description", str(parameters))[:200]}
+        params = {"query": params.get("description", str(params))[:200]}
     
     # Run through centralized registry
-    result = execute_tool(tool, parameters or {})
+    result = execute_tool(tool, params)
     
-    # Handle error fallbacks like the original implementation
+    # Strict execution check — do NOT fabricate success via web search if tool is missing
     if result.startswith("ERROR: Unknown tool"):
-        print(f"[Executor] ⚠️ Unknown tool '{tool}' — using web search fallback")
-        from actions.web_search import web_search
-        return web_search(parameters={"query": f"{tool}: {parameters}"[:200]}) or "Done."
+        print(f"[Executor] ❌ Unknown tool '{tool}' cannot be executed.")
+        raise RuntimeError(f"Tool '{tool}' is not available on this system.")
         
     return result
 

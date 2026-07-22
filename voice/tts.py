@@ -211,6 +211,18 @@ class NeuralTTS:
     def is_speaking(self) -> bool:
         return self._is_speaking
 
+    def stop(self):
+        """Instantly stop any active speech playback (Barge-In interruption)."""
+        self._is_speaking = False
+        if self._current_alias:
+            MCIPlayer.stop(self._current_alias)
+            self._current_alias = None
+        if self._sapi_speaker:
+            try:
+                self._sapi_speaker.Speak("", 2)  # SAPI purge flag
+            except Exception:
+                pass
+
     def speak_async(self, text: str, on_start=None, on_finish=None):
         """Speak text in a background thread."""
         thread = threading.Thread(
@@ -227,15 +239,39 @@ class NeuralTTS:
             if on_start:
                 on_start()
 
+            # Clean text of all tool calls and XML/agent control tokens
+            import re
+            clean_text = re.sub(r'```tool_call\s*\n\s*\{.*?\}\s*\n\s*```', '', text, flags=re.DOTALL)
+            clean_text = re.sub(r'<\|start\|>.*?<\|call\|>', '', clean_text, flags=re.DOTALL)
+            clean_text = re.sub(r'<\|channel\|>.*?<\|call\|>', '', clean_text, flags=re.DOTALL)
+            clean_text = re.sub(r'<\|message\|>.*?<\|call\|>', '', clean_text, flags=re.DOTALL)
+            clean_text = re.sub(r'<\|.*?\|>', '', clean_text)
+            
+            # Clean remaining formatting marks
+            clean_text = re.sub(r'[*_~`#\[\](){}|<>]', '', clean_text).strip()
+
+            if not clean_text:
+                self._is_speaking = False
+                if on_finish:
+                    on_finish()
+                return
+
             try:
+                success = False
                 if _HAS_EDGE_TTS:
-                    self._speak_edge_tts(text)
-                elif _OS == "Windows" and self._sapi_speaker:
-                    self._speak_sapi5(text)
-                else:
-                    self._speak_linux_fallback(text)
+                    try:
+                        self._speak_edge_tts(clean_text)
+                        success = True
+                    except Exception as edge_err:
+                        print(f"[JARVIS] Edge-TTS offline or failed ({edge_err}). Falling back to SAPI5/native...")
+                
+                if not success:
+                    if _OS == "Windows" and self._sapi_speaker:
+                        self._speak_sapi5(clean_text)
+                    else:
+                        self._speak_linux_fallback(clean_text)
             except Exception as e:
-                print(f"[JARVIS] TTS error: {e}")
+                print(f"[JARVIS] TTS final error: {e}")
                 traceback.print_exc()
             finally:
                 self._is_speaking = False

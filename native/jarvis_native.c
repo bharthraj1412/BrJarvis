@@ -39,7 +39,24 @@ EXPORT float jarvis_audio_energy(const float* buffer, size_t samples) {
     return (float)sqrt(sum / (double)samples);
 }
 
-/* 3. High-Speed Grid Coordinate Transformation (0..1000 -> Screen Pixels) */
+/* 3. High-Speed Dense Vector Cosine Similarity for Memory RAG Search */
+EXPORT float jarvis_vector_dot_product(const float* vec1, const float* vec2, size_t dim) {
+    if (!vec1 || !vec2 || dim == 0) return 0.0f;
+    double dot = 0.0;
+    double norm1 = 0.0;
+    double norm2 = 0.0;
+    for (size_t i = 0; i < dim; i++) {
+        double v1 = (double)vec1[i];
+        double v2 = (double)vec2[i];
+        dot += v1 * v2;
+        norm1 += v1 * v1;
+        norm2 += v2 * v2;
+    }
+    if (norm1 <= 0.0 || norm2 <= 0.0) return 0.0f;
+    return (float)(dot / (sqrt(norm1) * sqrt(norm2)));
+}
+
+/* 4. High-Speed Grid Coordinate Transformation (0..1000 -> Screen Pixels) */
 EXPORT void jarvis_grid_transform(int x_norm, int y_norm, int screen_w, int screen_h, int* out_x, int* out_y) {
     if (!out_x || !out_y) return;
     int px = (int)(((double)x_norm / 1000.0) * (double)screen_w);
@@ -54,7 +71,7 @@ EXPORT void jarvis_grid_transform(int x_norm, int y_norm, int screen_w, int scre
     *out_y = py;
 }
 
-/* 4. Low-Overhead Linux C System Memory Reader */
+/* 5. Low-Overhead Linux C System Memory Reader */
 EXPORT uint64_t jarvis_sys_memory_avail_kb(void) {
 #if defined(__linux__)
     FILE* fp = fopen("/proc/meminfo", "r");
@@ -74,7 +91,7 @@ EXPORT uint64_t jarvis_sys_memory_avail_kb(void) {
 #endif
 }
 
-/* 5. C Library Version Check */
+/* 6. C Library Version Check */
 EXPORT const char* jarvis_native_version(void) {
-    return "37.2.0-native-hybrid";
+    return "37.5.0-native-accelerated";
 }

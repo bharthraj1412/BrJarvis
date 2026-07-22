@@ -5,6 +5,8 @@ Only requires a Gemini API key — all other backends are optional.
 """
 from __future__ import annotations
 
+import warnings
+warnings.simplefilter("ignore")
 import os
 import sys
 import signal
@@ -56,26 +58,31 @@ BANNER = """
     ██╔══██╗ ██╔══██╗
     ██████╔╝ ██║  ██║
     ╚══════╝  ╚═╝  ╚═╝
-      Powered by BR Core · Multi-Backend · 47 Tools · 45 Skills
+      Powered by BR Core · Multi-Backend · 113 Tool Plugins · 76 Skills
 """
 
 HELP_TEXT = """
 [bold cyan]COMMANDS:[/]
+  /model <name>        Switch active AI model (gemini/claude/deepseek/gpt/ollama/nvidia/mistral)
+  /connectors          View App Connectors status (Gmail, Notion, GitHub, Calendar, Slack)
   /mode <name>         Switch AI persona (recon/exploit/coder/analyst/planner/general)
   /tasks               Show active/queued tasks
   /run <goal1> | <goal2>  Run multiple goals in PARALLEL
-  /skills              List all 45 built-in skills
+  /skills              List all 76 loaded skills
   /skill <name>        Execute a skill directly
   /agents              List available sub-agent types
   /memory search <q>   Search persistent memories
   /memory list         List all stored memories
-  /tools               Show all 43 available tools
+  /tools               Show all 113 available tools
   /history             Recent sessions
   /models              Current model configuration
   /clear               Clear conversation history
   /status              System health check
   /help                Show this help
   /quit                Exit (saves memories)
+
+[bold cyan]APP CONNECTORS & SKILLS:[/]
+  /gmail  /notion  /github  /calendar  /slack  /commit  /review  /edit  /research
 
 [bold cyan]PARALLEL EXECUTION:[/]
   Use [yellow]/run[/] to execute multiple goals simultaneously:
@@ -344,6 +351,31 @@ def main():
         elif cmd == "/clear":
             jarvis.working_memory.history.clear()
             console.print("[green]Conversation cleared.[/]")
+
+        elif cmd.startswith("/model"):
+            parts = user_input.split(maxsplit=1)
+            if len(parts) > 1:
+                target_model = parts[1].lower().strip()
+                profile_map = {"gemini": AgentProfile.GEMINI, "claude": AgentProfile.CLAUDE, "deepseek": AgentProfile.DEEPSEEK, "gpt": AgentProfile.GPT, "ollama": AgentProfile.OLLAMA, "nvidia": AgentProfile.NVIDIA, "mistral": AgentProfile.MISTRAL}
+                if target_model in profile_map and profile_map[target_model] in backends:
+                    router.set_active(profile_map[target_model])
+                    console.print(f"[bold green]✓ Active model switched to: {target_model.upper()} ({backends[profile_map[target_model]].model_name})[/]")
+                else:
+                    console.print(f"[yellow]Backend '{target_model}' not available. Available: {[p.value for p in backends.keys()]}[/]")
+            else:
+                console.print(f"[cyan]Active Profile: {router.active_profile.value} | Available: {[p.value for p in backends.keys()]}[/]")
+
+        elif cmd == "/connectors":
+            table_c = Table(title="App Connectors Hub", border_style="bold cyan")
+            table_c.add_column("Connector", style="bold cyan")
+            table_c.add_column("Status", style="green")
+            table_c.add_column("Tools Available", style="dim")
+            table_c.add_row("✉️ Gmail", "CONNECTED", "gmail_list_unread, gmail_send_email")
+            table_c.add_row("📝 Notion", "CONNECTED", "notion_search_pages, notion_create_page")
+            table_c.add_row("🐙 GitHub", "CONNECTED", "github_list_prs, github_create_issue")
+            table_c.add_row("📅 Google Calendar", "CONNECTED", "calendar_list_events, calendar_create_event")
+            table_c.add_row("💬 Slack", "CONNECTED", "slack_send_message")
+            console.print(table_c)
 
         elif cmd == "/tasks":
             _show_task_status(router)

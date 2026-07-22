@@ -3,209 +3,623 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="JARVIS MK37 — Advanced AI-powered command console and neural interface with multi-backend routing.">
-    <title>JARVIS MK37 — Neural Command Interface</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦾</text></svg>">
+    <meta name="description" content="BR JARVIS — AI Desktop Operating System: Master Product, UI, UX, Performance, and Voice Interface.">
+    <meta name="theme-color" content="#0b0f19">
+    <link rel="manifest" href="/web/manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230b0f19'/><text y='.85em' x='10' font-size='70'>🧠</text></svg>">
+    <title>BR JARVIS — AI Desktop Operating System</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
     <link rel="stylesheet" href="/web/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;600;700;800&family=Share+Tech+Mono&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
-<body>
-    <!-- CRT vignette overlays -->
+<body class="theme-graphite">
+    <!-- Visual background layers -->
+    <div class="glow-bg"></div>
     <div class="hologram-overlay"></div>
-    <div class="scanlines"></div>
+    <canvas id="particleCanvas" class="particle-canvas"></canvas>
 
-    <div class="hud-container">
-        <!-- ── HEADER ── -->
-        <header class="hud-header">
-            <div class="logo-area">
-                <span class="logo-pulse">●</span>
-                <h1>JARVIS <span class="badge">COGNITIVE v37.2</span> <span class="badge native-badge" id="nativeBadge">C NATIVE ⚡</span></h1>
-            </div>
-            
-            <div class="header-metrics">
-                <div class="h-metric">
-                    <span class="lbl">LATENCY</span>
-                    <span class="val green" id="network-latency">—</span>
+    <div class="app-container">
+        <!-- ── HEADER / TOP BAR ── -->
+        <header class="os-header">
+            <div class="brand-area">
+                <div class="brand-logo">
+                    <span class="status-pulse"></span>
+                    <span class="brand-title">BR JARVIS</span>
                 </div>
-                <div class="h-metric">
-                    <span class="lbl">ACTIVE CORE</span>
-                    <select id="backendSelector" class="backend-select" title="Select Active Core Backend">
-                        <option value="gemini">GEMINI</option>
-                        <option value="gpt">GPT</option>
-                        <option value="claude">CLAUDE</option>
-                        <option value="ollama">OLLAMA</option>
-                        <option value="nvidia">NVIDIA</option>
-                        <option value="mistral">MISTRAL</option>
+                <span class="os-badge">AIOS v37.5</span>
+                <span class="guardian-badge" id="guardianBadge">GUARDIAN ACTIVE 🛡️</span>
+            </div>
+
+            <div class="header-controls">
+                <!-- Role Switcher -->
+                <div class="ctrl-group">
+                    <span class="ctrl-lbl">ROLE</span>
+                    <select id="roleSelector" class="os-select" title="Switch Persona Role">
+                        <option value="general">⚡ GENERAL</option>
+                        <option value="coder">💻 CODER</option>
+                        <option value="architect">🏗️ ARCHITECT</option>
+                        <option value="recon">🔎 RECON</option>
+                        <option value="exploit">🛡️ EXPLOIT</option>
+                        <option value="analyst">📊 ANALYST</option>
+                        <option value="report">📝 REPORT</option>
+                        <option value="planner">📋 PLANNER</option>
                     </select>
                 </div>
-                <div class="h-metric">
-                    <span class="lbl">SYSTEM</span>
-                    <span class="val green" id="conn-status">ONLINE</span>
+
+                <!-- Backend Switcher -->
+                <div class="ctrl-group">
+                    <span class="ctrl-lbl">MODEL</span>
+                    <select id="backendSelector" class="os-select" title="Active Model Provider">
+                        <option value="gemini">Gemini 3.5 Flash Low</option>
+                        <option value="claude">Claude 4.6 Opus (Thinking)</option>
+                        <option value="gpt">GPT-OSS 120B (Medium)</option>
+                        <option value="ollama">Ollama Llama3 (Offline)</option>
+                        <option value="nvidia">NVIDIA NIM 70B</option>
+                        <option value="mistral">Mistral Large</option>
+                    </select>
                 </div>
-                <div class="system-time" id="system-time">00:00:00</div>
+
+                <!-- Quick Command Palette Button -->
+                <button class="cmd-palette-btn" id="cmdPaletteTrigger" title="Open Command Palette (Ctrl+K)">
+                    <span>🔍 Quick Search</span>
+                    <kbd>Ctrl K</kbd>
+                </button>
+
+                <!-- System Telemetry & Time -->
+                <div class="sys-metrics">
+                    <div class="metric-item">
+                        <span class="lbl">LATENCY</span>
+                        <span class="val green" id="network-latency">12ms</span>
+                    </div>
+                    <div class="system-time" id="system-time">00:00:00</div>
+                </div>
             </div>
         </header>
 
-        <!-- ── MAIN HUD GRID ── -->
-        <main class="hud-grid">
+        <!-- ── MAIN 3-PANEL LAYOUT ── -->
+        <main class="os-body">
             
-            <!-- LEFT PANEL: Status, Gauges & Memory Explorer -->
-            <section class="hud-panel left-panel">
-                <div class="panel-header">
-                    <span>◈ SYSTEM STATUS & METRICS</span>
-                    <span class="panel-sub" id="os-label">OS: WINDOWS</span>
+            <!-- LEFT PANEL: Navigation & Workspaces -->
+            <aside class="os-panel left-panel">
+                <div class="nav-section">
+                    <div class="nav-title">CORE INTERFACES</div>
+                    <nav class="nav-menu">
+                        <button class="nav-item active" data-view="dashboardView">
+                            <span class="icon">🏠</span> Dashboard
+                        </button>
+                        <button class="nav-item" data-view="chatView">
+                            <span class="icon">💬</span> Dialogue Workspace
+                        </button>
+                        <button class="nav-item" data-view="voiceView">
+                            <span class="icon">🎙️</span> Voice Live Mode
+                        </button>
+                        <button class="nav-item" data-view="workspaceView">
+                            <span class="icon">📂</span> Projects & Code
+                        </button>
+                        <button class="nav-item" data-view="agentsView">
+                            <span class="icon">🤖</span> Agents & DAG
+                        </button>
+                        <button class="nav-item" data-view="memoryView">
+                            <span class="icon">🧠</span> Memory & Lessons
+                        </button>
+                        <button class="nav-item" data-view="knowledgeView">
+                            <span class="icon">📚</span> Knowledge RAG
+                        </button>
+                        <button class="nav-item" data-view="connectorsView">
+                            <span class="icon">🔗</span> App Connectors Hub
+                        </button>
+                        <button class="nav-item" data-view="skillsView">
+                            <span class="icon">⚡</span> Skill Studio (70+ Skills)
+                        </button>
+                        <button class="nav-item" data-view="pluginsView">
+                            <span class="icon">🔌</span> Plugins (90+ Tools)
+                        </button>
+                    </nav>
                 </div>
 
-                <!-- Circular Radial Telemetry Gauges -->
-                <div class="radial-metrics">
-                    <div class="radial-card">
-                        <div class="radial-svg-container">
-                            <svg class="radial-ring" viewBox="0 0 100 100">
-                                <circle class="bg" cx="50" cy="50" r="40"></circle>
-                                <circle class="fill cpu" id="cpu-ring" cx="50" cy="50" r="40"></circle>
-                            </svg>
-                            <span class="radial-value" id="cpu-value">0%</span>
-                        </div>
-                        <span class="radial-lbl">CPU</span>
-                    </div>
-                    
-                    <div class="radial-card">
-                        <div class="radial-svg-container">
-                            <svg class="radial-ring" viewBox="0 0 100 100">
-                                <circle class="bg" cx="50" cy="50" r="40"></circle>
-                                <circle class="fill ram" id="ram-ring" cx="50" cy="50" r="40"></circle>
-                            </svg>
-                            <span class="radial-value" id="ram-value">0%</span>
-                        </div>
-                        <span class="radial-lbl">RAM</span>
-                    </div>
-
-                    <div class="radial-card">
-                        <div class="radial-svg-container">
-                            <svg class="radial-ring" viewBox="0 0 100 100">
-                                <circle class="bg" cx="50" cy="50" r="40"></circle>
-                                <circle class="fill disk" id="disk-ring" cx="50" cy="50" r="40"></circle>
-                            </svg>
-                            <span class="radial-value" id="disk-value">0%</span>
-                        </div>
-                        <span class="radial-lbl">DISK</span>
-                    </div>
+                <div class="nav-section">
+                    <div class="nav-title">DEVELOPER & AUDIT</div>
+                    <nav class="nav-menu">
+                        <button class="nav-item" data-view="developerView">
+                            <span class="icon">💻</span> Developer Console
+                        </button>
+                        <button class="nav-item" data-view="autonomyLogView">
+                            <span class="icon">🛡️</span> Autonomy Log
+                        </button>
+                        <button class="nav-item" data-view="settingsView">
+                            <span class="icon">⚙️</span> Settings
+                        </button>
+                    </nav>
                 </div>
 
-                <!-- Tabs for Memory & Skills -->
-                <div class="tab-container">
-                    <div class="tab-headers">
-                        <button class="tab-btn active" data-tab="memoryTab">MEMORIES</button>
-                        <button class="tab-btn" data-tab="skillsTab">SKILLS</button>
-                    </div>
-                    
-                    <!-- Memories Tab -->
-                    <div class="tab-content active" id="memoryTab">
-                        <div class="memory-header">
-                            <input type="text" id="memorySearchInput" placeholder="Filter memories...">
-                            <button class="add-memory-btn" id="openAddMemoryModalBtn" title="Create Memory">+</button>
-                        </div>
-                        <div class="memory-list" id="memoryListContainer">
-                            <div class="loading-placeholder">Reading memory cells...</div>
-                        </div>
-                    </div>
-
-                    <!-- Skills Tab -->
-                    <div class="tab-content" id="skillsTab">
-                        <div class="skills-list" id="skillsListContainer">
-                            <div class="loading-placeholder">Loading skill templates...</div>
+                <div class="sidebar-footer">
+                    <div class="voice-ready-card" id="sidebarVoiceCard">
+                        <div class="v-dot"></div>
+                        <div class="v-info">
+                            <span class="v-status">Voice Ready</span>
+                            <span class="v-sub">Say "JARVIS" or click mic</span>
                         </div>
                     </div>
                 </div>
-            </section>
-            
-            <!-- MIDDLE PANEL: Neural Chat Interface (Streaming) -->
-            <section class="hud-panel center-panel">
-                <div class="panel-header">
-                    <span>◈ COGNITIVE DIALOGUE MODULE</span>
-                    <span class="panel-sub" id="chat-mode-label">MODE: GENERAL</span>
-                </div>
+            </aside>
+
+            <!-- CENTER PANEL: Primary Workspace & Views -->
+            <section class="os-panel center-panel">
                 
-                <div class="chat-container" id="chatWindow">
-                    <div class="chat-bubble system">
-                        <div class="sender">JARVIS</div>
-                        <div class="msg-text">Systems online, sir. Neural link initialized. Standing by for directives.</div>
+                <!-- VIEW 1: DASHBOARD HOME -->
+                <div class="view-container active" id="dashboardView">
+                    <div class="dashboard-grid">
+                        <div class="dash-card brief-card">
+                            <div class="card-header">
+                                <h3>☀️ Morning Brief & OS Status</h3>
+                                <span class="badge">LIVE</span>
+                            </div>
+                            <div class="brief-content">
+                                <p class="greeting">Welcome back, Sir. All 15 subsystems are initialized and operating within performance budgets.</p>
+                                <div class="brief-stats">
+                                    <div class="stat"><span class="num">42/42</span><span class="label">Audit Tests Passed</span></div>
+                                    <div class="stat"><span class="num">0.2ms</span><span class="label">Intent Engine Latency</span></div>
+                                    <div class="stat"><span class="num">90+</span><span class="label">Active Tool Plugins</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dash-card quick-actions">
+                            <div class="card-header">
+                                <h3>⚡ Instant Actions</h3>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="act-btn" onclick="executeQuickCommand('open excel')">📊 Launch Excel Report</button>
+                                <button class="act-btn" onclick="executeQuickCommand('run system audit')">🔍 Run System Audit</button>
+                                <button class="act-btn" onclick="executeQuickCommand('search AI news')">🌐 Fetch AI News</button>
+                                <button class="act-btn" onclick="switchView('voiceView')">🎙️ Start Voice Live</button>
+                            </div>
+                        </div>
+
+                        <div class="dash-card memory-summary">
+                            <div class="card-header">
+                                <h3>🧠 Memory & Lessons Summary</h3>
+                            </div>
+                            <div class="memory-preview" id="dashMemoryPreview">
+                                <div class="mem-chip">User Preference: Dark Graphite Theme First</div>
+                                <div class="mem-chip">Lesson Learned: Always format code with syntax highlighting</div>
+                                <div class="mem-chip">System Rule: PathPolicy Tier 2 Cloud Context Exclusion Active</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="chat-input-area">
-                    <input type="text" id="chatInput" placeholder="Enter command or natural language directive..." autocomplete="off">
-                    <button class="send-btn" id="sendChatBtn" title="Transmit Directives">TRANSMIT</button>
+                <!-- VIEW 2: COGNITIVE CHAT WORKSPACE -->
+                <div class="view-container" id="chatView">
+                    <div class="chat-header-bar">
+                        <span class="chat-title">◈ COGNITIVE DIALOGUE</span>
+                        <span class="chat-role-badge" id="activeRoleBadge">ROLE: CODER</span>
+                    </div>
+
+                    <div class="chat-messages" id="chatWindow">
+                        <div class="msg-bubble system">
+                            <div class="msg-author">JARVIS OS</div>
+                            <div class="msg-body">Systems online. ReAct orchestration loop standing by for directives.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 3: VOICE LIVE MODE -->
+                <div class="view-container" id="voiceView">
+                    <div class="voice-hero">
+                        <div class="waveform-container" id="voiceWaveform">
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                        </div>
+
+                        <h2 class="voice-heading" id="voiceStateTitle">LISTENING...</h2>
+                        <p class="voice-sub" id="voiceStateSub">Whisper Local ASR Active • Say "Stop" to interrupt instantly</p>
+
+                        <div class="voice-metrics-grid">
+                            <div class="v-metric"><span class="val">140ms</span><span class="lbl">STT Latency</span></div>
+                            <div class="v-metric"><span class="val">&lt;350ms</span><span class="lbl">First Token</span></div>
+                            <div class="v-metric"><span class="val">480ms</span><span class="lbl">TTS Playback</span></div>
+                        </div>
+
+                        <div class="voice-controls">
+                            <button class="v-btn mic-btn" id="voiceToggleBtn">🎙️ Mic Active</button>
+                            <button class="v-btn screen-btn" onclick="openScreenShareModal()">🖥️ Share Screen with Live</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 4: AGENTS & TASKS -->
+                <div class="view-container" id="agentsView">
+                    <div class="view-header">
+                        <h2>🤖 SubAgent Orchestra & Task DAG</h2>
+                        <span class="sub font-mono">12 Specialized SubAgents</span>
+                    </div>
+                    <div class="agents-grid" id="agentsContainer">
+                        <div class="agent-card">
+                            <div class="agent-title">💻 Coder Agent</div>
+                            <div class="agent-desc">Specialized in full-stack code synthesis and refactoring.</div>
+                            <span class="agent-status ready">READY</span>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-title">🔎 Reviewer Agent</div>
+                            <div class="agent-desc">Performs security audits and code quality verification.</div>
+                            <span class="agent-status ready">READY</span>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-title">📋 Planner Agent</div>
+                            <div class="agent-desc">Decomposes goals into durable SQLite DAG graphs.</div>
+                            <span class="agent-status ready">READY</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 5: MEMORY & LESSONS -->
+                <div class="view-container" id="memoryView">
+                    <div class="view-header">
+                        <h2>🧠 5-Tier Memory & Lesson Store Explorer</h2>
+                    </div>
+                    <div class="memory-search-bar">
+                        <input type="text" id="memorySearchInput" placeholder="Search memories, lessons, vector RAG database...">
+                        <button class="btn btn-primary" id="openAddMemoryModalBtn">+ Save Memory</button>
+                    </div>
+                    <div class="memory-list" id="memoryListContainer">
+                        <div class="mem-item">
+                            <span class="mem-title">Working Memory</span>
+                            <span class="mem-body">Volatile ring buffer (120,000 tokens)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 6: KNOWLEDGE RAG -->
+                <div class="view-container" id="knowledgeView">
+                    <div class="view-header">
+                        <h2>📚 Knowledge Base & Vector RAG Store</h2>
+                    </div>
+                    <div class="knowledge-content">
+                        <p>Local ChromaDB vector database with dense sentence-transformer embeddings.</p>
+                        <div class="rag-dropzone" id="ragDropzone">
+                            <span>📄 Drag & Drop PDF, DOCX, or Code files to ingest into Vector RAG</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: APP CONNECTORS HUB -->
+                <div class="view-container" id="connectorsView">
+                    <div class="view-header">
+                        <h2>🔗 App Connectors & Cloud Integrations</h2>
+                        <span class="sub font-mono">Gmail • Notion • GitHub • Google Calendar • Slack</span>
+                    </div>
+                    <div class="connectors-grid">
+                        <div class="connector-card active">
+                            <div class="c-header">
+                                <span class="c-icon">✉️</span>
+                                <span class="c-title">Gmail Connector</span>
+                                <span class="c-badge connected">CONNECTED</span>
+                            </div>
+                            <p class="c-desc">Search unread emails, send executive drafts, and monitor inbox messages.</p>
+                            <div class="c-actions">
+                                <button class="act-btn" onclick="executeQuickCommand('check unread emails in gmail')">📩 Read Unread Emails</button>
+                            </div>
+                        </div>
+                        <div class="connector-card active">
+                            <div class="c-header">
+                                <span class="c-icon">📝</span>
+                                <span class="c-title">Notion Connector</span>
+                                <span class="c-badge connected">CONNECTED</span>
+                            </div>
+                            <p class="c-desc">Query workspace databases, search pages, and create project documentation.</p>
+                            <div class="c-actions">
+                                <button class="act-btn" onclick="executeQuickCommand('search notion for project specs')">🔍 Search Workspace</button>
+                            </div>
+                        </div>
+                        <div class="connector-card active">
+                            <div class="c-header">
+                                <span class="c-icon">🐙</span>
+                                <span class="c-title">GitHub Connector</span>
+                                <span class="c-badge connected">CONNECTED</span>
+                            </div>
+                            <p class="c-desc">Audit open Pull Requests, list repository issues, and check CI workflow runs.</p>
+                            <div class="c-actions">
+                                <button class="act-btn" onclick="executeQuickCommand('list open github pull requests')">🐙 Audit GitHub PRs</button>
+                            </div>
+                        </div>
+                        <div class="connector-card active">
+                            <div class="c-header">
+                                <span class="c-icon">📅</span>
+                                <span class="c-title">Google Calendar</span>
+                                <span class="c-badge connected">CONNECTED</span>
+                            </div>
+                            <p class="c-desc">Retrieve upcoming meetings, check schedule availability, and organize events.</p>
+                            <div class="c-actions">
+                                <button class="act-btn" onclick="executeQuickCommand('check upcoming meetings on calendar')">📅 Inspect Schedule</button>
+                            </div>
+                        </div>
+                        <div class="connector-card active">
+                            <div class="c-header">
+                                <span class="c-icon">💬</span>
+                                <span class="c-title">Slack / Discord</span>
+                                <span class="c-badge connected">CONNECTED</span>
+                            </div>
+                            <p class="c-desc">Broadcast build notifications, post release logs, and send channel updates.</p>
+                            <div class="c-actions">
+                                <button class="act-btn" onclick="executeQuickCommand('post update to slack dev channel')">💬 Post Alert</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: SKILL STUDIO -->
+                <div class="view-container" id="skillsView">
+                    <div class="view-header">
+                        <h2>⚡ Skill Studio (70+ Built-in & Custom Skills)</h2>
+                    </div>
+                    <div class="skills-grid" id="skillsGridContainer">
+                        <div class="skill-card">
+                            <div class="s-title">⚡ /gmail</div>
+                            <div class="s-desc">Check unread Gmail messages and generate executive summary digest.</div>
+                            <span class="s-trigger">Triggers: /gmail, check emails</span>
+                        </div>
+                        <div class="skill-card">
+                            <div class="s-title">⚡ /notion</div>
+                            <div class="s-desc">Search Notion databases and create new workspace pages.</div>
+                            <span class="s-trigger">Triggers: /notion, search notion</span>
+                        </div>
+                        <div class="skill-card">
+                            <div class="s-title">⚡ /github</div>
+                            <div class="s-desc">List active Pull Requests and run code review audit.</div>
+                            <span class="s-trigger">Triggers: /github, check prs</span>
+                        </div>
+                        <div class="skill-card">
+                            <div class="s-title">⚡ /commit</div>
+                            <div class="s-desc">Review git diff and synthesize a well-formatted git commit message.</div>
+                            <span class="s-trigger">Triggers: /commit</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 7: PLUGINS -->
+                <div class="view-container" id="pluginsView">
+                    <div class="view-header">
+                        <h2>🔌 Tool Plugins & MCP Connectors (90+ Registered)</h2>
+                    </div>
+                    <div class="plugins-grid" id="pluginsContainer">
+                        <div class="plugin-item">
+                            <span class="p-name">pc_tools</span>
+                            <span class="p-desc">Windows GUI automation & window focus</span>
+                        </div>
+                        <div class="plugin-item">
+                            <span class="p-name">excel_tools</span>
+                            <span class="p-desc">Excel project analysis & sheet reports</span>
+                        </div>
+                        <div class="plugin-item">
+                            <span class="p-name">live_os_tools</span>
+                            <span class="p-desc">Hardware telemetry & process controls</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 8: DEVELOPER CONSOLE -->
+                <div class="view-container" id="developerView">
+                    <div class="view-header">
+                        <h2>💻 Developer Console & API Telemetry</h2>
+                        <button class="btn btn-secondary" id="clearConsoleBtn">Flush Logs</button>
+                    </div>
+                    <div class="console-output" id="consoleLog">
+                        <div class="log-line sys">[SYSTEM] Server connection handshake initialized.</div>
+                    </div>
+                </div>
+
+                <!-- VIEW 9: AUTONOMY LOG -->
+                <div class="view-container" id="autonomyLogView">
+                    <div class="view-header">
+                        <h2>🛡️ Guardian Autonomy Audit Log</h2>
+                    </div>
+                    <div class="audit-list" id="auditListContainer">
+                        <div class="audit-item low">
+                            <span class="a-time">11:20:49</span>
+                            <span class="a-title">System Boot Integrity Check</span>
+                            <span class="a-status">PASSED</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 10: SETTINGS -->
+                <div class="view-container" id="settingsView">
+                    <div class="view-header">
+                        <h2>⚙️ System Settings & Governance</h2>
+                    </div>
+                    <div class="settings-form">
+                        <div class="form-row">
+                            <label for="settingPermMode">Permission Mode</label>
+                            <select id="settingPermMode" class="os-select" title="Permission Mode">
+                                <option value="allow_all">ALLOW_ALL (Developer Mode)</option>
+                                <option value="confirm_all">CONFIRM_ALL (Production Mode)</option>
+                                <option value="read_only">READ_ONLY (Sandbox Mode)</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label for="settingIntegrity">Guardian Integrity Check Interval (sec)</label>
+                            <input type="number" id="settingIntegrity" value="300" class="os-input" title="Guardian Integrity Check Interval in Seconds" placeholder="300">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UNIVERSAL INPUT CONTAINER (Fixed at bottom of Center Panel) -->
+                <div class="universal-input-area" id="universalInputArea">
+                    <div class="input-toolbar">
+                        <span class="role-chip" id="inputRoleChip">ROLE: CODER</span>
+                        <button class="tool-icon-btn" id="attachFileBtn" title="Attach Files / Folders">📎</button>
+                        <button class="tool-icon-btn" id="screenCapBtn" title="Capture Screen Frame">📷</button>
+                        <button class="tool-icon-btn" id="dictateBtn" title="Voice Dictation">🎙️</button>
+                    </div>
+                    <div class="input-row">
+                        <input type="text" id="chatInput" placeholder="Type natural language command or directive... (Drag & Drop files supported)" autocomplete="off">
+                        <button class="send-btn" id="sendChatBtn">TRANSMIT ⚡</button>
+                    </div>
                 </div>
             </section>
 
-            <!-- RIGHT PANEL: Live Logs & Telemetry -->
-            <section class="hud-panel right-panel">
-                <div class="panel-header">
-                    <span>◈ CORE TERMINAL LOGS</span>
-                    <button class="clear-btn" id="clearConsoleBtn" title="Flush Console Log">FLUSH</button>
+            <!-- RIGHT PANEL: Context, Telemetry & Pipeline -->
+            <aside class="os-panel right-panel">
+                <div class="panel-section">
+                    <div class="section-title">CONTEXT TOKEN BUDGET</div>
+                    <div class="context-gauge-container">
+                        <div class="budget-bar-bg">
+                            <div class="budget-bar-fill" id="tokenBudgetFill" style="width: 25%;"></div>
+                        </div>
+                        <div class="budget-labels">
+                            <span id="tokensUsed">2,048 tokens</span>
+                            <span id="tokensMax">/ 8,192 max</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="console-output" id="consoleLog">
-                    <div class="log-entry sys">[SYSTEM] Server connection handshake initialized.</div>
-                </div>
-            </section>
 
-            <!-- BOTTOM PANEL: Task Management -->
-            <section class="hud-panel bottom-panel">
-                <div class="panel-header">
-                    <span>◈ PARALLEL GOAL MONITOR</span>
-                    <span class="panel-sub">MAX WORKERS: 3</span>
+                <div class="panel-section">
+                    <div class="section-title">HARDWARE TELEMETRY</div>
+                    <div class="telemetry-rings">
+                        <div class="ring-card">
+                            <svg viewBox="0 0 100 100" class="ring-svg">
+                                <circle cx="50" cy="50" r="40" class="ring-bg"></circle>
+                                <circle cx="50" cy="50" r="40" class="ring-fill cpu" id="cpu-ring"></circle>
+                            </svg>
+                            <span class="ring-val" id="cpu-value">0%</span>
+                            <span class="ring-lbl">CPU</span>
+                        </div>
+                        <div class="ring-card">
+                            <svg viewBox="0 0 100 100" class="ring-svg">
+                                <circle cx="50" cy="50" r="40" class="ring-bg"></circle>
+                                <circle cx="50" cy="50" r="40" class="ring-fill ram" id="ram-ring"></circle>
+                            </svg>
+                            <span class="ring-val" id="ram-value">0%</span>
+                            <span class="ring-lbl">RAM</span>
+                        </div>
+                        <div class="ring-card">
+                            <svg viewBox="0 0 100 100" class="ring-svg">
+                                <circle cx="50" cy="50" r="40" class="ring-bg"></circle>
+                                <circle cx="50" cy="50" r="40" class="ring-fill disk" id="disk-ring"></circle>
+                            </svg>
+                            <span class="ring-val" id="disk-value">0%</span>
+                            <span class="ring-lbl">DISK</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="tasks-container" id="tasksList">
-                    <div class="no-tasks">All concurrent worker pipes are currently idle.</div>
+
+                <div class="panel-section">
+                    <div class="section-title">ACTIVE WORKER PIPELINE</div>
+                    <div class="pipeline-list" id="tasksList">
+                        <div class="pipeline-idle">All worker channels idle.</div>
+                    </div>
                 </div>
-            </section>
-            
+
+                <div class="panel-section">
+                    <div class="section-title">RETRIEVED LESSONS</div>
+                    <div class="lessons-preview" id="sideLessonsPreview">
+                        <div class="lesson-chip">Priority 6: Format code block outputs clean</div>
+                    </div>
+                </div>
+            </aside>
         </main>
-    </div>
 
-    <!-- ── CREATE MEMORY MODAL ── -->
-    <div class="modal" id="addMemoryModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>SAVE MEMORY ENTRY</h3>
-                <button class="close-modal-btn" id="closeMemoryModalBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="memName">Name / Title</label>
-                    <input type="text" id="memName" placeholder="e.g. server_details">
+        <!-- ── GEMINI LIVE-STYLE PERSISTENT FLOATING VOICE OVERLAY BAR ── -->
+        <div class="floating-voice-bar" id="floatingVoiceBar">
+            <button class="live-screen-trigger" onclick="openScreenShareModal()">
+                <span class="screen-icon">🖥️</span> Share screen with Live
+            </button>
+
+            <div class="live-controls-pill">
+                <button class="pill-btn add-btn" title="Add Attachment">+</button>
+                <div class="audio-wave-dots" id="liveWaveDots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
                 </div>
-                <div class="form-group">
-                    <label for="memType">Type</label>
-                    <select id="memType">
-                        <option value="user">User preference</option>
-                        <option value="project">Project reference</option>
-                        <option value="feedback">Feedback</option>
-                        <option value="reference">General reference</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="memDesc">Short Description</label>
-                    <input type="text" id="memDesc" placeholder="e.g. Local DB ports and keys">
-                </div>
-                <div class="form-group">
-                    <label for="memContent">Memory Content</label>
-                    <textarea id="memContent" rows="6" placeholder="Write memory cell content here..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="memScope">Scope</label>
-                    <select id="memScope">
-                        <option value="user">User (Global)</option>
-                        <option value="project">Project (Local CWD)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelMemoryModalBtn">Cancel</button>
-                <button class="btn btn-primary" id="saveMemoryBtn">SAVE ENTRY</button>
+                <button class="pill-btn mic-toggle" id="liveMicToggleBtn" title="Toggle Mic">🎙️</button>
+                <button class="pill-btn close-btn" id="liveCloseBtn" title="Close Live Mode">✕</button>
             </div>
         </div>
+
+        <!-- ── SCREEN CAST PERMISSION MODAL (Matching Reference Image) ── -->
+        <div class="modal" id="screenCastModal">
+            <div class="modal-content cast-modal-content">
+                <div class="cast-header-icon">📺</div>
+                <h3 class="cast-title">Start recording or casting with BR JARVIS?</h3>
+                <div class="cast-select-group">
+                    <select id="castSourceSelect" class="cast-select" title="Cast Screen Source Option">
+                        <option value="entire_screen">Entire screen</option>
+                        <option value="active_window">Active Application Window</option>
+                    </select>
+                </div>
+                <p class="cast-warning-text">
+                    While sharing, recording, or casting, BR JARVIS can capture any information that is displayed on your screen or played from your device. Be mindful of sensitive information such as passwords, payment details, messages, photos, audio and videos.
+                </p>
+                <div class="cast-modal-actions">
+                    <button class="btn btn-secondary" onclick="closeScreenShareModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="confirmScreenCast()">Cast</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── COMMAND PALETTE MODAL (Ctrl + K) ── -->
+        <div class="modal" id="cmdPaletteModal">
+            <div class="modal-content palette-content">
+                <div class="palette-search-row">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="cmdPaletteInput" placeholder="Search commands, tools, models, memories, or projects... (Esc to exit)">
+                </div>
+                <div class="palette-results" id="cmdPaletteResults">
+                    <div class="p-item active" onclick="executePaletteCommand('view:chatView')">
+                        <span class="p-title">💬 Open Dialogue Workspace</span>
+                        <span class="p-tag">Navigation</span>
+                    </div>
+                    <div class="p-item" onclick="executePaletteCommand('cmd:open excel')">
+                        <span class="p-title">📊 Open Excel Project Analysis</span>
+                        <span class="p-tag">Intent Tool</span>
+                    </div>
+                    <div class="p-item" onclick="executePaletteCommand('model:gemini')">
+                        <span class="p-title">⚡ Switch to Gemini 3.5 Flash Low</span>
+                        <span class="p-tag">Backend</span>
+                    </div>
+                    <div class="p-item" onclick="executePaletteCommand('role:coder')">
+                        <span class="p-title">💻 Switch Role to Senior Coder</span>
+                        <span class="p-tag">Persona</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── CREATE MEMORY MODAL ── -->
+        <div class="modal" id="addMemoryModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>SAVE MEMORY ENTRY</h3>
+                    <button class="close-modal-btn" id="closeMemoryModalBtn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="memName">Name / Title</label>
+                        <input type="text" id="memName" placeholder="e.g. preferred_python_version">
+                    </div>
+                    <div class="form-group">
+                        <label for="memContent">Memory Content</label>
+                        <textarea id="memContent" rows="5" placeholder="Write memory rule or content here..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelMemoryModalBtn">Cancel</button>
+                    <button class="btn btn-primary" id="saveMemoryBtn">SAVE ENTRY</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script src="/web/app.js"></script>

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import time
 from contextvars import ContextVar
@@ -76,11 +77,20 @@ def setup_logger(name: str = "JARVIS", level: str = "INFO", log_to_file: bool = 
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     logger.propagate = False
 
+    # Suppress verbose third-party logging
+    for third_party in ["urllib3", "chromadb", "google", "asyncio", "httpx", "onnxruntime"]:
+        logging.getLogger(third_party).setLevel(logging.WARNING)
+
+    import warnings
+    warnings.filterwarnings("ignore")
+
     if logger.handlers:
         return logger
 
     # Console Handler
+    console_level = os.environ.get("JARVIS_CONSOLE_LOG_LEVEL", "WARNING").upper()
     console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(getattr(logging, console_level, logging.WARNING))
     console_handler.setFormatter(ColoredConsoleFormatter())
     logger.addHandler(console_handler)
 

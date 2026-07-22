@@ -1,20 +1,29 @@
-// web/app.js
+// web/app.js — BR JARVIS AI Desktop Operating System Client
 
 document.addEventListener('DOMContentLoaded', () => {
-    // ── CORE WEB CLIENT CONFIGURATION ──
     const host = window.location.host;
     const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
     const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const API_BASE = `${protocol}://${host}`;
     const WS_URL = `${wsProtocol}://${host}/ws`;
 
-    // ── HTML DOM ELEMENT BINDINGS ──
+    // DOM Elements
     const networkLatencyEl = document.getElementById('network-latency');
     const backendSelector = document.getElementById('backendSelector');
-    const connStatusEl = document.getElementById('conn-status');
+    const roleSelector = document.getElementById('roleSelector');
     const systemTimeEl = document.getElementById('system-time');
-    const osLabel = document.getElementById('os-label');
-    const chatModeLabel = document.getElementById('chat-mode-label');
+
+    const navItems = document.querySelectorAll('.nav-item');
+    const viewContainers = document.querySelectorAll('.view-container');
+
+    const chatWindow = document.getElementById('chatWindow');
+    const chatInput = document.getElementById('chatInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const inputRoleChip = document.getElementById('inputRoleChip');
+    const activeRoleBadge = document.getElementById('activeRoleBadge');
+
+    const consoleLog = document.getElementById('consoleLog');
+    const clearConsoleBtn = document.getElementById('clearConsoleBtn');
 
     // Gauges
     const cpuRing = document.getElementById('cpu-ring');
@@ -24,45 +33,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const ramValue = document.getElementById('ram-value');
     const diskValue = document.getElementById('disk-value');
 
-    // Tabs
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
+    // Command Palette
+    const cmdPaletteTrigger = document.getElementById('cmdPaletteTrigger');
+    const cmdPaletteModal = document.getElementById('cmdPaletteModal');
+    const cmdPaletteInput = document.getElementById('cmdPaletteInput');
+    const cmdPaletteResults = document.getElementById('cmdPaletteResults');
 
-    // Memory Explorer
-    const memoryListContainer = document.getElementById('memoryListContainer');
-    const memorySearchInput = document.getElementById('memorySearchInput');
-    const openAddMemoryModalBtn = document.getElementById('openAddMemoryModalBtn');
+    // Modals
+    const screenCastModal = document.getElementById('screenCastModal');
     const addMemoryModal = document.getElementById('addMemoryModal');
-    const closeMemoryModalBtn = document.getElementById('closeMemoryModalBtn');
-    const cancelMemoryModalBtn = document.getElementById('cancelMemoryModalBtn');
-    const saveMemoryBtn = document.getElementById('saveMemoryBtn');
-    const memNameInput = document.getElementById('memName');
-    const memTypeSelect = document.getElementById('memType');
-    const memDescInput = document.getElementById('memDesc');
-    const memContentTextarea = document.getElementById('memContent');
-    const memScopeSelect = document.getElementById('memScope');
-
-    // Skills
-    const skillsListContainer = document.getElementById('skillsListContainer');
-
-    // Chat Dialog
-    const chatWindow = document.getElementById('chatWindow');
-    const chatInput = document.getElementById('chatInput');
-    const sendChatBtn = document.getElementById('sendChatBtn');
-
-    // Console logs
-    const consoleLog = document.getElementById('consoleLog');
-    const clearConsoleBtn = document.getElementById('clearConsoleBtn');
-
-    // Task Queue
-    const tasksList = document.getElementById('tasksList');
 
     let socket = null;
-    let localMemories = [];
-    let isWaitingForResponse = false;
+    let isVoiceActive = false;
 
-    // ── GAUGE UTILS ──
-    // Dasharray circumference is 2 * PI * r = 2 * 3.14159 * 40 = 251.2
+    // ── SYSTEM TIME ──
+    function updateSystemTime() {
+        if (systemTimeEl) {
+            systemTimeEl.textContent = new Date().toLocaleTimeString();
+        }
+    }
+    setInterval(updateSystemTime, 1000);
+    updateSystemTime();
+
+    // ── GAUGE UPDATES ──
     function setGauge(ring, textEl, value) {
         if (!ring || !textEl) return;
         const val = Math.min(100, Math.max(0, parseFloat(value) || 0));
@@ -71,417 +64,436 @@ document.addEventListener('DOMContentLoaded', () => {
         textEl.textContent = `${Math.round(val)}%`;
     }
 
-    // ── SYSTEM TIME ──
-    function updateSystemTime() {
-        const d = new Date();
-        systemTimeEl.textContent = d.toLocaleTimeString();
-    }
-    setInterval(updateSystemTime, 1000);
-    updateSystemTime();
-
-    // ── TAB SWITCHER ──
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
-        });
-    });
-
-    // ── MEMORY MODAL ──
-    openAddMemoryModalBtn.addEventListener('click', () => {
-        addMemoryModal.style.display = 'flex';
-        memNameInput.value = '';
-        memDescInput.value = '';
-        memContentTextarea.value = '';
-    });
-
-    const closeModal = () => { addMemoryModal.style.display = 'none'; };
-    closeMemoryModalBtn.addEventListener('click', closeModal);
-    cancelMemoryModalBtn.addEventListener('click', closeModal);
-
-    // Save Memory
-    saveMemoryBtn.addEventListener('click', async () => {
-        const name = memNameInput.value.trim();
-        const type = memTypeSelect.value;
-        const desc = memDescInput.value.trim();
-        const content = memContentTextarea.value.trim();
-        const scope = memScopeSelect.value;
-
-        if (!name || !content) {
-            alert('Please specify both Name and Content for the memory cell.');
-            return;
-        }
-
-        try {
-            const res = await fetch(`${API_BASE}/api/memory`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, type, description: desc, content, scope })
-            });
-            if (res.ok) {
-                appendLog(`[SYSTEM] Memory entry '${name}' saved successfully.`, 'sys');
-                closeModal();
-                loadMemories();
+    // ── VIEW SWITCHER ──
+    window.switchView = function(viewId) {
+        navItems.forEach(item => {
+            if (item.dataset.view === viewId) {
+                item.classList.add('active');
             } else {
-                appendLog('[SYSTEM] Failed to write memory entry to storage cell.', 'err');
+                item.classList.remove('active');
             }
-        } catch (e) {
-            appendLog(`[SYSTEM] Error communicating with memory store: ${e.message}`, 'err');
-        }
-    });
-
-    // Load Memories
-    async function loadMemories() {
-        try {
-            const res = await fetch(`${API_BASE}/api/memory`);
-            if (res.ok) {
-                const data = await res.json();
-                localMemories = data.memories || [];
-                renderMemories(localMemories);
-            }
-        } catch (e) {
-            console.error('Error fetching memories', e);
-        }
-    }
-
-    function renderMemories(memories) {
-        memoryListContainer.innerHTML = '';
-        if (memories.length === 0) {
-            memoryListContainer.innerHTML = '<div class="no-tasks">No memory cells found in scope.</div>';
-            return;
-        }
-        memories.forEach(m => {
-            const div = document.createElement('div');
-            div.className = 'memory-item';
-            div.innerHTML = `
-                <div class="title">
-                    <span>${m.name}</span>
-                    <span class="type-tag">${m.type}/${m.scope}</span>
-                </div>
-                <div class="desc">${m.description || m.content.substring(0, 50)}</div>
-                <button class="delete-cell" title="Wipe Memory Cell">&times;</button>
-            `;
-            // Trigger deletion on click
-            div.querySelector('.delete-cell').addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (confirm(`Are you sure you want to wipe memory cell '${m.name}'?`)) {
-                    deleteMemory(m.name, m.scope);
-                }
-            });
-            // Click to populate chat
-            div.addEventListener('click', () => {
-                chatInput.value = `Tell me about the memory: ${m.name}`;
-                chatInput.focus();
-            });
-            memoryListContainer.appendChild(div);
         });
-    }
-
-    async function deleteMemory(name, scope) {
-        try {
-            const res = await fetch(`${API_BASE}/api/memory/${encodeURIComponent(name)}?scope=${scope}`, {
-                method: 'DELETE'
-            });
-            if (res.ok) {
-                appendLog(`[SYSTEM] Memory cell '${name}' wiped.`, 'sys');
-                loadMemories();
+        viewContainers.forEach(container => {
+            if (container.id === viewId) {
+                container.classList.add('active');
             } else {
-                appendLog(`[SYSTEM] Failed to wipe memory cell '${name}'.`, 'err');
+                container.classList.remove('active');
             }
-        } catch (e) {
-            appendLog(`[SYSTEM] Delete communication error: ${e.message}`, 'err');
-        }
-    }
+        });
+    };
 
-    // Filter Memories
-    memorySearchInput.addEventListener('input', () => {
-        const q = memorySearchInput.value.toLowerCase().trim();
-        if (!q) {
-            renderMemories(localMemories);
-            return;
-        }
-        const filtered = localMemories.filter(m => 
-            m.name.toLowerCase().includes(q) || 
-            (m.description && m.description.toLowerCase().includes(q)) ||
-            m.content.toLowerCase().includes(q)
-        );
-        renderMemories(filtered);
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const viewId = item.dataset.view;
+            if (viewId) switchView(viewId);
+        });
     });
 
-    // ── LOAD SKILLS ──
-    async function loadSkills() {
-        try {
-            const res = await fetch(`${API_BASE}/api/skills`);
-            if (res.ok) {
-                const skills = await res.json();
-                renderSkills(skills);
-            }
-        } catch (e) {
-            console.error('Error fetching skills', e);
-        }
-    }
-
-    function renderSkills(skills) {
-        skillsListContainer.innerHTML = '';
-        if (skills.length === 0) {
-            skillsListContainer.innerHTML = '<div class="no-tasks">No preloaded skills available.</div>';
-            return;
-        }
-        skills.forEach(s => {
-            const div = document.createElement('div');
-            div.className = 'skill-item';
-            const trigger = s.triggers && s.triggers.length > 0 ? s.triggers[0] : `/skill ${s.name}`;
-            div.innerHTML = `
-                <div class="name">
-                    <span>${s.name}</span>
-                    <span class="trigger-tag">${trigger}</span>
-                </div>
-                <div class="desc">${s.description}</div>
-            `;
-            div.addEventListener('click', () => {
-                chatInput.value = `${trigger} `;
-                chatInput.focus();
-            });
-            skillsListContainer.appendChild(div);
+    // ── ROLE PERSONA SWITCHER ──
+    if (roleSelector) {
+        roleSelector.addEventListener('change', (e) => {
+            const role = e.target.value.toUpperCase();
+            if (activeRoleBadge) activeRoleBadge.textContent = `ROLE: ${role}`;
+            if (inputRoleChip) inputRoleChip.textContent = `ROLE: ${role}`;
+            appendLog(`[ROLE] Persona switched to ${role}`, 'sys');
         });
     }
 
-    // ── SYSTEM TELEMETRY ──
-    async function fetchTelemetry() {
-        const start = performance.now();
-        try {
-            const res = await fetch(`${API_BASE}/api/status`);
-            if (res.ok) {
-                const elapsed = Math.round(performance.now() - start);
-                networkLatencyEl.textContent = `${elapsed}ms`;
-                networkLatencyEl.className = 'val ' + (elapsed < 100 ? 'green' : elapsed < 250 ? 'orange' : 'red');
+    // ── COMMAND PALETTE (Ctrl + K) ──
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            toggleCmdPalette();
+        }
+        if (e.key === 'Escape') {
+            closeAllModals();
+        }
+    });
 
-                const data = await res.json();
-                setGauge(cpuRing, cpuValue, data.cpu);
-                setGauge(ramRing, ramValue, data.ram);
-                setGauge(diskRing, diskValue, data.disk);
-                osLabel.textContent = `OS: ${data.os.toUpperCase()}`;
-                chatModeLabel.textContent = `MODE: ${data.mode.toUpperCase()}`;
-                
-                // Keep dropdown selection updated
-                if (data.backend && backendSelector.value !== data.backend) {
-                    backendSelector.value = data.backend;
-                }
+    if (cmdPaletteTrigger) {
+        cmdPaletteTrigger.addEventListener('click', toggleCmdPalette);
+    }
+
+    function toggleCmdPalette() {
+        if (cmdPaletteModal) {
+            cmdPaletteModal.classList.toggle('active');
+            if (cmdPaletteModal.classList.contains('active') && cmdPaletteInput) {
+                cmdPaletteInput.focus();
+                cmdPaletteInput.value = '';
             }
-        } catch (e) {
-            networkLatencyEl.textContent = 'TIMEOUT';
-            networkLatencyEl.className = 'val red';
         }
     }
-    setInterval(fetchTelemetry, 3000);
-    fetchTelemetry();
 
-    // Backend Selector Switching
-    backendSelector.addEventListener('change', async () => {
-        const selectBe = backendSelector.value;
-        appendLog(`[SYSTEM] Initiating core swap to: ${selectBe.toUpperCase()}`, 'sys');
+    function closeAllModals() {
+        document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+    }
+
+    window.executePaletteCommand = function(cmd) {
+        closeAllModals();
+        if (cmd.startsWith('view:')) {
+            switchView(cmd.split(':')[1]);
+        } else if (cmd.startsWith('cmd:')) {
+            executeQuickCommand(cmd.split(':')[1]);
+        } else if (cmd.startsWith('model:')) {
+            if (backendSelector) {
+                backendSelector.value = cmd.split(':')[1];
+                backendSelector.dispatchEvent(new Event('change'));
+            }
+        } else if (cmd.startsWith('role:')) {
+            if (roleSelector) roleSelector.value = cmd.split(':')[1];
+        }
+    };
+
+    // ── QUICK COMMAND EXECUTION ──
+    window.executeQuickCommand = function(text) {
+        switchView('chatView');
+        if (chatInput) {
+            chatInput.value = text;
+            transmitChat();
+        }
+    };
+
+    // ── SCREEN SHARE MODAL ──
+    window.openScreenShareModal = function() {
+        if (screenCastModal) screenCastModal.classList.add('active');
+    };
+
+    window.closeScreenShareModal = function() {
+        if (screenCastModal) screenCastModal.classList.remove('active');
+    };
+
+    window.confirmScreenCast = function() {
+        closeScreenShareModal();
+        appendLog('[SCREEN_CAST] Sharing active window / entire screen with Live Vision Engine...', 'sys');
+        switchView('voiceView');
+    };
+
+    // ── WEBSOCKET CONNECTION ──
+    function initWebSocket() {
         try {
-            const res = await fetch(`${API_BASE}/api/backend/switch`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ backend: selectBe })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                appendLog(`[SYSTEM] Core swap successful: ${data.message}`, 'sys');
+            socket = new WebSocket(WS_URL);
+
+            socket.onopen = () => {
+                appendLog('[SYSTEM] WebSocket Neural Link Connected', 'sys');
                 fetchTelemetry();
-            } else {
-                const err = await res.json();
-                appendLog(`[SYSTEM] Swap rejected: ${err.detail}`, 'err');
-            }
-        } catch (e) {
-            appendLog(`[SYSTEM] Core swap communication error: ${e.message}`, 'err');
-        }
-    });
+            };
 
-    // ── TASK PIPELINE STATUS ──
-    async function fetchTasks() {
-        try {
-            const res = await fetch(`${API_BASE}/api/tasks`);
-            if (res.ok) {
-                const data = await res.json();
-                renderTasks(data.tasks || []);
-            }
-        } catch (e) {
-            console.error('Error fetching tasks', e);
-        }
-    }
-    setInterval(fetchTasks, 2000);
-    fetchTasks();
-
-    function renderTasks(tasks) {
-        tasksList.innerHTML = '';
-        if (tasks.length === 0) {
-            tasksList.innerHTML = '<div class="no-tasks">All concurrent worker pipes are currently idle.</div>';
-            return;
-        }
-        tasks.forEach(t => {
-            const card = document.createElement('div');
-            card.className = `task-card ${t.status}`;
-            card.innerHTML = `
-                <div class="task-goal">${t.goal.substring(0, 45)}${t.goal.length > 45 ? '...' : ''}</div>
-                <div class="task-meta">
-                    <span class="lbl">ID: ${t.task_id.substring(0, 8)}</span>
-                    <span class="val ${t.status === 'running' ? 'green' : t.status === 'completed' ? 'cyan' : 'red'}">${t.status.toUpperCase()}</span>
-                </div>
-            `;
-            tasksList.appendChild(card);
-        });
-    }
-
-    // ── CHAT DIALOG MODULE (STREAMING) ──
-    async function handleChatSubmission() {
-        const text = chatInput.value.trim();
-        if (!text || isWaitingForResponse) return;
-
-        chatInput.value = '';
-        appendMessage('user', 'You', text);
-        isWaitingForResponse = true;
-
-        // Create initial assistant bubble
-        const bubble = appendMessage('assistant', 'JARVIS', 'Connecting pipeline...');
-        const textEl = bubble.querySelector('.msg-text');
-
-        try {
-            const streamUrl = `${API_BASE}/api/chat/stream?message=${encodeURIComponent(text)}`;
-            const eventSource = new EventSource(streamUrl);
-
-            let firstToken = true;
-
-            eventSource.onmessage = (event) => {
+            socket.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.error) {
-                        textEl.textContent = `[Error: ${data.error}]`;
-                        eventSource.close();
-                        isWaitingForResponse = false;
-                        return;
-                    }
-                    if (data.token) {
-                        if (firstToken) {
-                            textEl.innerHTML = '';
-                            firstToken = false;
-                        }
-                        
-                        // Parse tool indicators
-                        if (data.token.includes('[JARVIS] 🔧')) {
-                            textEl.innerHTML += `<div style="color: var(--color-cyan); font-family: var(--font-mono); font-size:11px; margin: 4px 0;">${data.token}</div>`;
-                        } else if (data.token.includes('[Tool Result:')) {
-                            textEl.innerHTML += `<div style="color: var(--color-green); font-family: var(--font-mono); font-size:11px; margin: 4px 0;">${data.token}</div>`;
-                        } else {
-                            // Normal token content - escape html and add
-                            const cleanText = data.token
-                                .replace(/&/g, "&amp;")
-                                .replace(/</g, "&lt;")
-                                .replace(/>/g, "&gt;");
-                            textEl.innerHTML += cleanText;
-                        }
-                        chatWindow.scrollTop = chatWindow.scrollHeight;
-                    }
+                    handleServerMessage(data);
                 } catch (e) {
-                    console.error('Error parsing SSE event data', e);
+                    appendLog(event.data, 'log');
                 }
             };
 
-            eventSource.onerror = (err) => {
-                eventSource.close();
-                isWaitingForResponse = false;
-                loadMemories(); // Refresh memory cells on chat completion
+            socket.onclose = () => {
+                appendLog('[SYSTEM] WebSocket Connection Lost — Reconnecting...', 'err');
+                setTimeout(initWebSocket, 3000);
             };
-
         } catch (e) {
-            textEl.textContent = `Error initiating data sync stream: ${e.message}`;
-            isWaitingForResponse = false;
+            console.error('WebSocket Init Error:', e);
         }
     }
 
-    sendChatBtn.addEventListener('click', handleChatSubmission);
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleChatSubmission();
-    });
-
-    function appendMessage(role, sender, text) {
-        const bubble = document.createElement('div');
-        bubble.className = `chat-bubble ${role}`;
-        
-        // Convert backticks codeblock formatting if non-streaming
-        let renderedText = text;
-        if (role === 'assistant' && text.includes('```')) {
-            renderedText = text.replace(/```(.*?)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+    function handleServerMessage(data) {
+        if (data.type === 'telemetry') {
+            if (data.cpu !== undefined) setGauge(cpuRing, cpuValue, data.cpu);
+            if (data.ram !== undefined) setGauge(ramRing, ramValue, data.ram);
+            if (data.disk !== undefined) setGauge(diskRing, diskValue, data.disk);
+        } else if (data.type === 'stream_chunk') {
+            appendChatStreamChunk(data.text);
+        } else if (data.type === 'chat_response') {
+            appendChatMessage('JARVIS', data.response, 'system');
+        } else if (data.type === 'log') {
+            appendLog(data.message, 'log');
         }
+    }
 
+    // ── CHAT TRANSMISSION ──
+    function transmitChat() {
+        if (!chatInput) return;
+        const text = chatInput.value.strip ? chatInput.value.strip() : chatInput.value.trim();
+        if (!text) return;
+
+        appendChatMessage('User', text, 'user');
+        chatInput.value = '';
+
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: 'chat_prompt',
+                prompt: text,
+                backend: backendSelector ? backendSelector.value : 'gemini',
+                role: roleSelector ? roleSelector.value : 'general'
+            }));
+        } else {
+            // REST Fallback
+            fetch(`${API_BASE}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: text })
+            })
+            .then(res => res.json())
+            .then(data => {
+                appendChatMessage('JARVIS', data.response || data.result, 'system');
+            })
+            .catch(err => {
+                appendChatMessage('JARVIS', `Error: ${err}`, 'system');
+            });
+        }
+    }
+
+    if (sendChatBtn) {
+        sendChatBtn.addEventListener('click', transmitChat);
+    }
+
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') transmitChat();
+        });
+    }
+
+    function appendChatMessage(author, text, type) {
+        if (!chatWindow) return;
+        const bubble = document.createElement('div');
+        bubble.className = `msg-bubble ${type}`;
         bubble.innerHTML = `
-            <div class="sender">${sender.toUpperCase()}</div>
-            <div class="msg-text">${renderedText}</div>
+            <div class="msg-author">${author}</div>
+            <div class="msg-body">${formatMarkdown(text)}</div>
         `;
         chatWindow.appendChild(bubble);
         chatWindow.scrollTop = chatWindow.scrollHeight;
-        return bubble;
     }
 
-    // ── CONSOLE LOGGER MODULE ──
-    function appendLog(line, type = 'log') {
-        const entry = document.createElement('div');
-        entry.className = `log-entry ${type}`;
-        
-        const timestamp = new Date().toLocaleTimeString();
-        entry.textContent = `[${timestamp}] ${line}`;
-        
-        consoleLog.appendChild(entry);
+    function formatMarkdown(text) {
+        if (!text) return '';
+        let escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Format code blocks
+        escaped = escaped.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        // Format inline code
+        escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+        // Format bold
+        escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        return escaped.replace(/\n/g, '<br>');
+    }
+
+    function appendLog(msg, type = 'sys') {
+        if (!consoleLog) return;
+        const line = document.createElement('div');
+        line.className = `log-line ${type}`;
+        line.textContent = msg;
+        consoleLog.appendChild(line);
         consoleLog.scrollTop = consoleLog.scrollHeight;
     }
 
-    clearConsoleBtn.addEventListener('click', () => {
-        consoleLog.innerHTML = '<div class="log-entry sys">[SYSTEM] Log interface flushed. Awaiting console broadcasts...</div>';
-    });
-
-    // ── WEBSOCKET LIVE SYNC (BROADCAST LOGS) ──
-    function connectWS() {
-        appendLog('[SYSTEM] Establishing live WebSocket feed...', 'sys');
-        socket = new WebSocket(WS_URL);
-
-        socket.onopen = () => {
-            connStatusEl.textContent = 'ONLINE';
-            connStatusEl.className = 'val green';
-            appendLog('[SYSTEM] Live WebSocket feed online.', 'sys');
-        };
-
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'log') {
-                    appendLog(data.message, 'log');
-                } else if (data.type === 'response') {
-                    appendMessage('assistant', 'JARVIS', data.message);
-                } else if (data.type === 'error') {
-                    appendMessage('assistant', 'JARVIS', `[Error: ${data.message}]`);
-                }
-            } catch (e) {
-                appendLog(`[SYSTEM] Socket parse error: ${e.message}`, 'err');
-            }
-        };
-
-        socket.onclose = () => {
-            connStatusEl.textContent = 'OFFLINE';
-            connStatusEl.className = 'val red';
-            appendLog('[SYSTEM] WebSocket feed disconnected. Reconnecting in 5s...', 'err');
-            setTimeout(connectWS, 5000);
-        };
-
-        socket.onerror = (err) => {
-            socket.close();
-        };
+    if (clearConsoleBtn) {
+        clearConsoleBtn.addEventListener('click', () => {
+            if (consoleLog) consoleLog.innerHTML = '';
+        });
     }
 
-    // Initialize Web App Components
-    connectWS();
-    loadMemories();
-    loadSkills();
+    // ── TELEMETRY FETCHING ──
+    function fetchTelemetry() {
+        fetch(`${API_BASE}/health`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.cpu_percent !== undefined) setGauge(cpuRing, cpuValue, data.cpu_percent);
+            if (data.memory_percent !== undefined) setGauge(ramRing, ramValue, data.memory_percent);
+            if (data.disk_percent !== undefined) setGauge(diskRing, diskValue, data.disk_percent);
+        })
+        .catch(() => {});
+    }
+
+    // ── HTML5 DYNAMIC PARTICLE ENGINE ──
+    function initParticleCanvas() {
+        const cvs = document.getElementById('particleCanvas');
+        if (!cvs) return;
+        const ctx = cvs.getContext('2d');
+        let width = cvs.width = window.innerWidth;
+        let height = cvs.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = cvs.width = window.innerWidth;
+            height = cvs.height = window.innerHeight;
+        });
+
+        const particles = [];
+        const particleCount = Math.min(45, Math.floor(width / 30));
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: (Math.random() - 0.5) * 0.4,
+                vy: (Math.random() - 0.5) * 0.4,
+                radius: Math.random() * 2 + 1,
+                color: Math.random() > 0.5 ? 'rgba(0, 242, 254, ' : 'rgba(121, 40, 202, '
+            });
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, width, height);
+
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < 0 || p.x > width) p.vx *= -1;
+                if (p.y < 0 || p.y > height) p.vy *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color + '0.6)';
+                ctx.fill();
+
+                // Draw connecting laser lines between nearby particles
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 130) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.strokeStyle = p.color + (1 - dist / 130) * 0.15 + ')';
+                        ctx.lineWidth = 0.8;
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        requestAnimationFrame(render);
+    }
+
+    // ── CONNECTORS & SKILLS DYNAMIC LOADERS ──
+    function fetchConnectors() {
+        fetch(`${API_BASE}/api/connectors`)
+            .then(res => res.json())
+            .then(data => {
+                const grid = document.getElementById('connectorsGrid');
+                if (!grid || !data.connectors) return;
+                grid.innerHTML = data.connectors.map(c => `
+                    <div class="connector-card">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-size: 24px;">${c.icon}</span>
+                            <span class="status-badge connected">${c.status}</span>
+                        </div>
+                        <h4 style="margin: 4px 0; font-family: var(--font-heading); color: #fff;">${c.name}</h4>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">${c.desc}</p>
+                        <div style="font-size: 11px; color: var(--accent-cyan); font-family: monospace;">
+                            ${c.tools.join(', ')}
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(() => {});
+    }
+
+    function fetchSkills() {
+        fetch(`${API_BASE}/api/skills`)
+            .then(res => res.json())
+            .then(skills => {
+                const grid = document.getElementById('skillsGrid');
+                if (!grid || !Array.isArray(skills)) return;
+                grid.innerHTML = skills.map(s => `
+                    <div class="skill-card">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <h4 style="margin: 0; color: var(--accent-purple); font-family: var(--font-heading);">${s.name}</h4>
+                            <span class="status-badge" style="background: rgba(121, 40, 202, 0.2); color: #00f2fe;">Built-in</span>
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted); margin: 8px 0;">${s.description}</p>
+                        <div style="font-size: 11px; color: var(--text-main); font-family: monospace;">
+                            Triggers: ${s.triggers.join(', ')}
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(() => {});
+    }
+
+    // ── DYNAMIC BACKEND MODEL SELECTOR & SYNCHRONIZER ──
+    function initBackendModelSelector() {
+        if (!backendSelector) return;
+
+        function syncModels() {
+            fetch(`${API_BASE}/api/models`)
+                .then(res => res.json())
+                .then(models => {
+                    const options = [];
+                    let defaultVal = 'gemini';
+                    
+                    for (const [key, details] of Object.entries(models)) {
+                        const opt = document.createElement('option');
+                        opt.value = key;
+                        opt.textContent = `${details.name} (${details.model})`;
+                        if (details.is_default) {
+                            opt.selected = true;
+                            defaultVal = key;
+                        }
+                        options.push(opt);
+                    }
+                    
+                    if (options.length > 0) {
+                        backendSelector.innerHTML = '';
+                        options.forEach(opt => backendSelector.appendChild(opt));
+                        backendSelector.value = defaultVal;
+                    }
+                    appendLog('[SYSTEM] Loaded active AI model backends from server', 'sys');
+                })
+                .catch(err => {
+                    console.warn('Failed to load dynamic model list, using fallback options', err);
+                });
+        }
+
+        // Load initially
+        syncModels();
+
+        // Listen for user change and switch backend on the server
+        backendSelector.addEventListener('change', (e) => {
+            const selectedBackend = e.target.value;
+            appendLog(`[SYSTEM] Switching backend to ${selectedBackend.toUpperCase()}...`, 'sys');
+            
+            fetch(`${API_BASE}/api/backend/switch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ backend: selectedBackend })
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                appendLog(`[SYSTEM] ${data.message || 'Successfully switched default backend.'}`, 'sys');
+            })
+            .catch(err => {
+                appendLog(`[SYSTEM] Failed to switch backend: ${err.message}`, 'err');
+                syncModels();
+            });
+        });
+    }
+
+    initBackendModelSelector();
+    fetchConnectors();
+    fetchSkills();
+
+    initParticleCanvas();
+    setInterval(fetchTelemetry, 5000);
+    initWebSocket();
+
+    // Register PWA Service Worker for multi-platform support
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/web/sw.js')
+                .then((reg) => console.log('[PWA] ServiceWorker registered with scope:', reg.scope))
+                .catch((err) => console.warn('[PWA] ServiceWorker registration failed:', err));
+        });
+    }
 });
