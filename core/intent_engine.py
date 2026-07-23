@@ -144,7 +144,14 @@ class DeterministicIntentEngine:
                 query = re.sub(r"^(?:recall|search memory for|what do you remember about|what do you remember)\s*", "", clean, flags=re.IGNORECASE).strip()
                 if query:
                     mems = find_relevant_memories(query)
-                    res_str = "\n".join([f"• {m}" for m in mems[:5]]) if mems else "No matching memories found."
+                    formatted_mems = []
+                    for m in mems[:5]:
+                        if isinstance(m, dict):
+                            txt = m.get("content") or m.get("description") or m.get("name", "")
+                            formatted_mems.append(f"• {txt}")
+                        else:
+                            formatted_mems.append(f"• {m}")
+                    res_str = "\n".join(formatted_mems) if formatted_mems else "No matching memories found."
                     return {
                         "executed": True,
                         "intent": "memory_recall",
@@ -219,6 +226,22 @@ class DeterministicIntentEngine:
                     "intent": "session_history",
                     "target": "session_store",
                     "result": f"Recent Session History:\n{res_str}",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0i. Match Media & Volume Controls
+        if any(phrase in clean for phrase in ["play music", "pause music", "resume music", "toggle playback", "play media", "pause media", "play", "pause"]):
+            try:
+                import pyautogui
+                pyautogui.FAILSAFE = False
+                pyautogui.press("playpause")
+                return {
+                    "executed": True,
+                    "intent": "media_control",
+                    "target": "playpause",
+                    "result": "Toggled media playback (0-Token Execution).",
                     "tokens_saved": 1500,
                 }
             except Exception:
@@ -433,7 +456,7 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
-        if clean in ("play", "pause", "play pause", "pause media", "play media", "toggle playback"):
+        if clean in ("play", "pause", "play pause", "pause media", "play media", "toggle playback", "play music", "pause music", "resume music", "next track", "previous track"):
             try:
                 import pyautogui
                 pyautogui.press("playpause")
