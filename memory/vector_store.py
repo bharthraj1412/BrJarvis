@@ -30,11 +30,11 @@ except ImportError:
 
 
 class GeminiEmbeddingFunction(_BaseClass):
-    """ChromaDB embedding function using modern Google GenAI Client (text-embedding-004)."""
+    """ChromaDB embedding function using modern Google GenAI Client (models/gemini-embedding-001)."""
     def __init__(self, api_key: str):
         self.api_key = api_key
         self._client = None
-        self.model = "text-embedding-004"
+        self.model = "models/gemini-embedding-001"
 
     @staticmethod
     def name() -> str:
@@ -57,18 +57,25 @@ class GeminiEmbeddingFunction(_BaseClass):
                 res = self.client.models.embed_content(
                     model=self.model,
                     contents=text,
-                    config={"output_dimensionality": 768}
                 )
                 val = res.embeddings[0].values
+                if len(val) > 768:
+                    val = val[:768]
+                elif len(val) < 768:
+                    val = val + [0.0] * (768 - len(val))
                 embeddings.append(val)
             except Exception as e:
-                # Fallback model attempt if text-embedding-004 fails
+                # Fallback model attempt if primary model fails
                 try:
                     res = self.client.models.embed_content(
-                        model="models/embedding-001",
+                        model="models/gemini-embedding-2-preview",
                         contents=text
                     )
                     val = res.embeddings[0].values
+                    if len(val) > 768:
+                        val = val[:768]
+                    elif len(val) < 768:
+                        val = val + [0.0] * (768 - len(val))
                     embeddings.append(val)
                 except Exception as inner_e:
                     print(f"[VectorMemory] Embedding generation warning: {e} / {inner_e}")

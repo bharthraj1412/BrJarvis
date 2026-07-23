@@ -106,6 +106,13 @@ class SessionStore:
         conn = self._get_conn()
         conn.executescript(_SCHEMA_SQL)
         try:
+            cols = [r["name"] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+            if "last_active_ts" not in cols:
+                conn.execute("ALTER TABLE sessions ADD COLUMN last_active_ts INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass
+
+        try:
             conn.executescript(_FTS_SQL)
             conn.executescript(_FTS_TRIGGER_SQL)
         except sqlite3.OperationalError:
