@@ -53,6 +53,25 @@ class DeterministicIntentEngine:
         clean = text.lower().strip().rstrip(".!;")
         lines = [line.strip().lower() for line in text.splitlines() if line.strip()]
 
+        # Guard: Defer complex queries containing pipelines, conditionals, chaining, or streaming overrides to LLM
+        complex_keywords = [
+            "|", "named ", "content:", "then ", "create a pdf", "create a word", "save to",
+            " when ", " if ", " unless ", " after ", " before ", " because ", " though ", " although ",
+            " and tell ", " and show ", " and then ", " but ", " except ", " on spotify", " on youtube",
+            "play some ", "play artist ", "play playlist ", "play album "
+        ]
+        if any(marker in clean for marker in complex_keywords):
+            return None
+
+        # Guard: Defer multi-word commands (longer than 10 words) unless starting with specific execution verbs
+        if len(text.split()) > 10 and not any(clean.startswith(prefix) for prefix in ["/run", "open ", "launch ", "remember ", "recall "]):
+            return None
+
+        # Guard: Defer location or timezone-specific time/date queries to the LLM clock tool
+        if any(phrase in clean for phrase in ["what time", "current time", "tell me the time", "what date", "current date", "what day is it"]):
+            if any(marker in clean for marker in [" in ", " at ", " for ", " zone", " timezone"]):
+                return None
+
         # 0. Match Weather Intent (e.g., "what is the weather today", "weather in London", "temperature today")
         if any(w in clean for w in ["weather", "temperature"]):
             try:
