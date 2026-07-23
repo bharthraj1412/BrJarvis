@@ -89,8 +89,7 @@ def _fetch_weather_data(city: str) -> str | None:
             f"• Condition: {desc}\n"
             f"• Temperature: {temp_c}°C (Feels like {feels}°C)\n"
             f"• Humidity: {humidity}%\n"
-            f"• Wind: {wind_km} km/h {wind_dir}\n"
-            f"[DONE — weather data retrieved successfully]"
+            f"• Wind: {wind_km} km/h {wind_dir}"
         )
     except Exception:
         return None

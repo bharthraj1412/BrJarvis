@@ -185,15 +185,24 @@ class DeterministicIntentEngine:
         # 0g. Match Network Telemetry Intent
         if any(phrase in clean for phrase in ["get network status", "check ip address", "network status", "my ip address", "ip address"]):
             try:
-                import socket
+                import socket, urllib.request, json
                 hostname = socket.gethostname()
                 local_ip = socket.gethostbyname(hostname)
+                public_ip = "Unknown"
+                conn_status = "Offline"
+                try:
+                    req = urllib.request.urlopen("https://api.ipify.org?format=json", timeout=2.0)
+                    data = json.loads(req.read().decode())
+                    public_ip = data.get("ip", "Unknown")
+                    conn_status = "Online (Connected)"
+                except Exception:
+                    pass
                 return {
                     "executed": True,
                     "intent": "network_status",
                     "target": "network_interface",
-                    "result": f"Network Telemetry:\n• Hostname: {hostname}\n• Local IP Address: {local_ip}",
-                    "tokens_saved": 1200,
+                    "result": f"🌐 Comprehensive Network Telemetry:\n• Hostname: {hostname}\n• Local IP Address: {local_ip}\n• Public IP Address: {public_ip}\n• Internet Status: {conn_status}",
+                    "tokens_saved": 1500,
                 }
             except Exception:
                 pass
