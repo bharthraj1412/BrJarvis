@@ -36,9 +36,10 @@ graph TD
 ## 3. Key Components & Implementation Details
 
 ### A. Zero-Token Deterministic Intent Engine (`core/intent_engine.py`)
-`DeterministicIntentEngine` evaluates incoming natural language prompts against high-speed regex pattern matchers before any LLM inference occurs:
-- **App Launches**: `"open excel"`, `"launch chrome"`, `"start calculator"` → Directly resolved via `APP_MAPPINGS` dictionary and `subprocess.Popen` (Saves 2,400 tokens per call).
+`DeterministicIntentEngine` evaluates incoming natural language prompts against high-speed regex pattern matchers across **50+ deterministic intent categories** before any LLM inference occurs:
+- **App Launches**: `"open excel"`, `"launch chrome"`, `"open brave"`, `"start calculator"` → Directly resolved via `APP_MAPPINGS` dictionary (including `brave`, `firefox`, `chrome`, `edge`, `vscode`, `notepad`, `cmd`, etc.) and `subprocess.Popen` (Saves 2,400 tokens per call).
 - **Web Navigation**: `"open google.com"`, `"visit github.com"` → Dispatched via native OS browser handles (Saves 1,800 tokens per call).
+- **System & Codebase Telemetry**: `"current branch"`, `"show recent commits"`, `"largest file in project"`, `"free RAM memory"`, `"battery status"`, `"cpu frequency"`, `"disk partitions"` → Instant local zero-token telemetry (Saves 1,500 - 3,500 tokens per call).
 - **Excel Codebase Reports**: `"excel project analysis"` → Triggers `tools.excel_tools.analyze_project_to_excel()` directly (Saves 3,500 tokens per call).
 
 ### B. High-Speed FNV-1a Hashing (`core/native_bridge.py`)

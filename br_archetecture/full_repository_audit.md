@@ -1,6 +1,7 @@
 # 🔍 BR JARVIS — Comprehensive Repository Audit & Subsystem Verification Report
 
-> **Audit Date**: 2026-07-22  
+> **Audit Date**: 2026-07-23  
+> **System Version**: MK37.25 (Round 24 Voice Upgrades + Round 25 Context Fix)  
 > **Target Workspace**: `d:\BRJARVIS\Br-Jarvis`  
 > **Auditor**: Senior Systems & Cognitive AI Architect  
 

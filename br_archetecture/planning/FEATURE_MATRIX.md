@@ -36,3 +36,7 @@
 | **Vision Engine** | Screen Capture, PyTesseract OCR, DOM Bridge | ✅ Production | `vision/` |
 | **Voice Subsystem** | Local Whisper ASR + Neural TTS | ✅ Production | `voice/` |
 | **Tool Ecosystem** | 90+ Tools & `@register_tool` | ✅ Production | `tools/` |
+| **Context Resolver** | Anaphoric Pronoun & History Resolver | ✅ Production | `orchestrator._resolve_context_references` |
+| **Live OS Control** | Visual Action Target Trace (Red Crosshair) | ✅ Production | `actions/live_os_control.py` |
+| **Orchestrator** | User Turn WorkingMemory Injection Fix | ✅ Production | `orchestrator.chat()` |
+
