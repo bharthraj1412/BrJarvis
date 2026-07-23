@@ -858,6 +858,59 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0aq. Match CPU load query directly
+        if any(phrase in clean for phrase in ["what is the cpu load", "cpu load", "current cpu load", "get cpu load"]):
+            try:
+                import psutil
+                cpu_load = psutil.cpu_percent(interval=0.1)
+                return {
+                    "executed": True,
+                    "intent": "cpu_load",
+                    "target": "processor",
+                    "result": f"💻 CPU Load Telemetry:\n• Current CPU Utilization: {cpu_load}%",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0ar. Match Python Modules Counter Intent
+        if any(phrase in clean for phrase in ["count python modules", "list python modules", "python modules"]):
+            try:
+                py_files = [f for f in Path(".").rglob("*.py") if not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)]
+                module_names = sorted(list(set(f.stem for f in py_files)))
+                return {
+                    "executed": True,
+                    "intent": "python_modules",
+                    "target": "codebase",
+                    "result": f"🐍 Python Modules Telemetry:\n• Unique Python Modules Detected: {len(module_names)}\n• Core Modules List: {', '.join(module_names[:12])}...",
+                    "tokens_saved": 2000,
+                }
+            except Exception:
+                pass
+
+        # 0as. Match Disk Partitions Telemetry Intent
+        if any(phrase in clean for phrase in ["check disk partitions", "disk partitions", "list partitions"]):
+            try:
+                import psutil
+                parts = psutil.disk_partitions()
+                part_lines = []
+                for p in parts[:5]:
+                    try:
+                        usage = psutil.disk_usage(p.mountpoint)
+                        pct = f"{usage.percent}% used"
+                    except Exception:
+                        pct = "Unknown load"
+                    part_lines.append(f"• Drive {p.device} mounted at '{p.mountpoint}' ({p.fstype} | {pct})")
+                return {
+                    "executed": True,
+                    "intent": "disk_partitions",
+                    "target": "disk_drive",
+                    "result": f"💾 Disk Partitions Telemetry:\n" + "\n".join(part_lines),
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
