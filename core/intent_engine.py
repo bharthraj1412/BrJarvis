@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import webbrowser
+from pathlib import Path
 
 
 class DeterministicIntentEngine:
@@ -158,7 +159,6 @@ class DeterministicIntentEngine:
         if any(phrase in clean for phrase in ["take a screenshot", "capture screen", "take screenshot", "screenshot"]):
             try:
                 from datetime import datetime
-                from pathlib import Path
                 screenshots_dir = Path("BR_WORKSPACE/Screenshots")
                 screenshots_dir.mkdir(parents=True, exist_ok=True)
                 filename = screenshots_dir / f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
@@ -371,7 +371,7 @@ class DeterministicIntentEngine:
                 pass
 
         # 7. Match Codebase Security Audit Intent
-        if any(phrase in clean for phrase in ["audit codebase", "code security audit", "security audit"]):
+        if any(phrase in clean for phrase in ["audit codebase", "codebase analysis", "full codebase analysis", "codebase audit", "code security audit", "security audit"]):
             try:
                 from tools.audit_tools import audit_codebase
                 audit_msg = audit_codebase({})
@@ -451,7 +451,6 @@ class DeterministicIntentEngine:
             try:
                 from PIL import ImageGrab
                 from datetime import datetime
-                from pathlib import Path
                 screenshots_dir = Path("BR_WORKSPACE/Screenshots")
                 screenshots_dir.mkdir(parents=True, exist_ok=True)
                 filename = screenshots_dir / f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"

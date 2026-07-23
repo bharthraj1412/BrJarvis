@@ -288,10 +288,11 @@ def search_memory(query: str, scope: str = "all") -> list[MemoryEntry]:
 
     # Fallback: case-insensitive keyword match
     q = query.lower()
+    q_words = [w for w in q.split() if len(w) >= 3]
     results = []
     for entry in all_entries:
         haystack = f"{entry.name} {entry.description} {entry.content}".lower()
-        if q in haystack:
+        if q in haystack or any(w in haystack or (len(w) >= 4 and w[:4] in haystack) for w in q_words):
             results.append(entry)
     return results
 
