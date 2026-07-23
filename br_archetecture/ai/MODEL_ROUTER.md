@@ -40,7 +40,8 @@ graph TD
 |---|---|---|---|
 | `GeminiBackend` | [backends/gemini.py](file:///d:/BRJARVIS/Br-Jarvis/backends/gemini.py) | `gemini-2.5-flash` / `gemini-3.5-flash` | Google Search grounding, native vision, 1M+ token context window, structured JSON mode. |
 | `ClaudeBackend` | [backends/anthropic.py](file:///d:/BRJARVIS/Br-Jarvis/backends/anthropic.py) | `claude-3-5-sonnet-20241022` | Complex code synthesis, multi-step ReAct planning, precise docstring generation. |
-| `OpenAIBackend` | [backends/openai_compat.py](file:///d:/BRJARVIS/Br-Jarvis/backends/openai_compat.py) | `gpt-4o` / `gpt-4o-mini` | OpenAI API compatibility, function calling, fallback provider. |
+| `OpenAIBackend` | [backends/openai_compat.py](file:///d:/BRJARVIS/Br-Jarvis/backends/openai_compat.py) | `gpt-oss-120b-medium` / `gpt-4o` | OpenAI API compatibility, function calling, fallback provider. |
+| `DeepSeekBackend` | [backends/deepseek.py](file:///d:/BRJARVIS/Br-Jarvis/backends/deepseek.py) | `deepseek/deepseek-r1` | Deep reasoning, CoT step expansion, open router integration. |
 | `OllamaBackend` | [backends/ollama.py](file:///d:/BRJARVIS/Br-Jarvis/backends/ollama.py) | `llama3:latest` | 100% offline air-gapped processing, zero external telemetry, local privacy mode. |
 | `NvidiaBackend` | [backends/nvidia.py](file:///d:/BRJARVIS/Br-Jarvis/backends/nvidia.py) | `meta/llama-3.1-70b-instruct` | High-throughput GPU inference acceleration via NVIDIA NIM microservices. |
 | `MistralBackend` | [backends/mistral.py](file:///d:/BRJARVIS/Br-Jarvis/backends/mistral.py) | `mistral-large-latest` | Fast multilingual translation and compact reasoning. |
@@ -53,17 +54,18 @@ Task requests pass through `ROUTING_RULES` mapping to select candidate backends 
 
 ```python
 ROUTING_RULES = {
-    "code":           [AgentProfile.GEMINI, AgentProfile.CLAUDE, AgentProfile.GPT],
+    "code":           [AgentProfile.GEMINI, AgentProfile.CLAUDE, AgentProfile.GPT, AgentProfile.DEEPSEEK],
     "security":       [AgentProfile.GEMINI, AgentProfile.CLAUDE],
     "creative":       [AgentProfile.CLAUDE, AgentProfile.GEMINI, AgentProfile.GPT],
-    "search":         [AgentProfile.GEMINI],
-    "local_private":  [AgentProfile.OLLAMA, AgentProfile.GEMINI],
+    "search":         [AgentProfile.GEMINI, AgentProfile.CLAUDE],
+    "local_private":  [AgentProfile.OLLAMA],  # Fail-closed privacy guarantee
     "long_context":   [AgentProfile.GEMINI, AgentProfile.CLAUDE],
     "gpu_inference":  [AgentProfile.NVIDIA, AgentProfile.GEMINI],
     "fast_inference": [AgentProfile.GEMINI, AgentProfile.MISTRAL],
     "multilingual":   [AgentProfile.GEMINI, AgentProfile.MISTRAL],
-    "vision":         [AgentProfile.GEMINI],
+    "vision":         [AgentProfile.GEMINI, AgentProfile.CLAUDE],
     "analysis":       [AgentProfile.GEMINI, AgentProfile.CLAUDE, AgentProfile.GPT],
+    "reasoning":      [AgentProfile.DEEPSEEK, AgentProfile.CLAUDE, AgentProfile.GEMINI],
 }
 ```
 

@@ -27,17 +27,18 @@ class AgentProfile(Enum):
 
 # Intelligent routing — route tasks to the best backend when available
 ROUTING_RULES = {
-    "code":           [AgentProfile.GEMINI, AgentProfile.CLAUDE, AgentProfile.GPT],
+    "code":           [AgentProfile.GEMINI, AgentProfile.CLAUDE, AgentProfile.GPT, AgentProfile.DEEPSEEK],
     "security":       [AgentProfile.GEMINI, AgentProfile.CLAUDE],
     "creative":       [AgentProfile.CLAUDE, AgentProfile.GEMINI, AgentProfile.GPT],
-    "search":         [AgentProfile.GEMINI],
-    "local_private":  [AgentProfile.OLLAMA, AgentProfile.GEMINI],
+    "search":         [AgentProfile.GEMINI, AgentProfile.CLAUDE],
+    "local_private":  [AgentProfile.OLLAMA],
     "long_context":   [AgentProfile.GEMINI, AgentProfile.CLAUDE],
     "gpu_inference":  [AgentProfile.NVIDIA, AgentProfile.GEMINI],
     "fast_inference": [AgentProfile.GEMINI, AgentProfile.MISTRAL],
     "multilingual":   [AgentProfile.GEMINI, AgentProfile.MISTRAL],
-    "vision":         [AgentProfile.GEMINI],
+    "vision":         [AgentProfile.GEMINI, AgentProfile.CLAUDE],
     "analysis":       [AgentProfile.GEMINI, AgentProfile.CLAUDE, AgentProfile.GPT],
+    "reasoning":      [AgentProfile.DEEPSEEK, AgentProfile.CLAUDE, AgentProfile.GEMINI],
 }
 
 _PROFILE_MAP = {p.value: p for p in AgentProfile}
@@ -249,6 +250,12 @@ class AgentRouter:
             self.tokens_consumed["total"] += out_tokens
             return res
         except Exception as e:
+            # Privacy Protection: If local_private requested Ollama, fail closed without cloud failover
+            if profile == AgentProfile.OLLAMA:
+                raise RuntimeError(
+                    f"Privacy Protection Error: Local backend (Ollama) failed — {e}. "
+                    "Task was marked 'local_private' and will NOT failover to cloud backends."
+                ) from e
             # Try fallback on failure
             print(f"[Router] {profile.value} failed: {e} — trying fallback...")
             fallback = self._find_fallback(profile)
@@ -262,9 +269,14 @@ class AgentRouter:
 
     def _find_fallback(self, exclude: AgentProfile = None) -> AgentProfile:
         """Find a working fallback backend."""
-        # Priority: Gemini > GPT > Claude > any other
+        if exclude == AgentProfile.OLLAMA:
+            raise RuntimeError(
+                "Privacy Protection Error: Local backend (Ollama) unavailable. "
+                "Task was marked 'local_private' and will NOT failover to cloud backends."
+            )
+        # Priority: Gemini > GPT > Claude > DeepSeek > others
         priority = [AgentProfile.GEMINI, AgentProfile.GPT, AgentProfile.CLAUDE,
-                     AgentProfile.OLLAMA, AgentProfile.MISTRAL, AgentProfile.NVIDIA]
+                     AgentProfile.DEEPSEEK, AgentProfile.OLLAMA, AgentProfile.MISTRAL, AgentProfile.NVIDIA]
         for p in priority:
             if p != exclude and p in self.backends:
                 return p

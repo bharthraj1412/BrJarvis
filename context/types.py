@@ -31,12 +31,24 @@ class ContextItem(BaseModel):
 
 
 class TokenBudget(BaseModel):
-    max_tokens: int = Field(default=8192, description="Maximum total tokens allowed for prompt context")
-    reserve_response_tokens: int = Field(default=2048, description="Reserved tokens for AI output generation")
+    max_tokens: int = Field(default=128000, description="Maximum total tokens allowed for prompt context")
+    reserve_response_tokens: int = Field(default=4096, description="Reserved tokens for AI output generation")
+
+    @classmethod
+    def from_profile(cls, profile_str: str = "gemini") -> TokenBudget:
+        """Dynamic token budget scaling based on backend model capability."""
+        low_p = (profile_str or "").lower()
+        if "gemini" in low_p:
+            return cls(max_tokens=1000000, reserve_response_tokens=8192)
+        elif any(k in low_p for k in ["claude", "gpt", "deepseek"]):
+            return cls(max_tokens=128000, reserve_response_tokens=4096)
+        elif any(k in low_p for k in ["ollama", "nvidia", "mistral"]):
+            return cls(max_tokens=32000, reserve_response_tokens=2048)
+        return cls(max_tokens=128000, reserve_response_tokens=4096)
 
     @property
     def available_context_tokens(self) -> int:
-        return max(500, self.max_tokens - self.reserve_response_tokens)
+        return max(2000, self.max_tokens - self.reserve_response_tokens)
 
 
 class AssembledContext(BaseModel):

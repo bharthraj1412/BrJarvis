@@ -80,7 +80,13 @@ class AutoDeployer:
             )
             return {"deployed": False, "reason": "Post-deploy healthcheck failed, rolled back", "rollback": rb_res}
 
-        # 6. Log success
+        # 6. Rehash Guardian integrity baseline on successful deploy
+        try:
+            self.guardian.rehash_integrity()
+        except Exception:
+            pass
+
+        # 7. Log success
         AuditLog.log(
             event_type="PATCH_DEPLOYED",
             title=proposal.get("title", "Patch Proposal"),

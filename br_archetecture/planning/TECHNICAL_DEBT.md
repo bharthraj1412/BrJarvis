@@ -18,7 +18,7 @@ All 58 pytest unit & integration tests (`python -m pytest tests/`) and 42 deep a
    - *Target*: Consolidate all external callers onto direct `backends.<name>` imports.
 
 2. **UI Monolith Refactoring**:
-   - `ui.py` (69 KB PySide interface) contains full GUI widget definitions and event loops.
+   - `ui.py` (71 KB Tkinter desktop interface) contains full GUI widget definitions and event loops.
    - *Target*: Modularize `ui.py` into `ui/components/` (ChatPanel, LogViewer, SettingsModal).
 
 3. **Tool File Consolidation**:

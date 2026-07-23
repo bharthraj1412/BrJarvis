@@ -75,6 +75,20 @@ class ToolRuntimeEngine:
             logger.warning(f"🔒 {err_msg}")
             raise PermissionError(err_msg)
 
+        # 1b. RedTeam Prompt Injection Audit for untrusted input parameters
+        try:
+            from tools.redteam_tools import audit_prompt_security
+            for arg_k, arg_v in args.items():
+                if isinstance(arg_v, str) and len(arg_v) > 20:
+                    sec_res = audit_prompt_security({"content": arg_v})
+                    if isinstance(sec_res, str) and "INJECTION DETECTED" in sec_res:
+                        logger.warning(f"🛡️ RedTeam Security Alert: Injection detected in tool '{name}' arg '{arg_k}'")
+                        raise ValueError(f"Security Alert: Prompt injection pattern detected in argument '{arg_k}'")
+        except ValueError:
+            raise
+        except Exception:
+            pass
+
         # 2. Result Caching for Read-Only Tools
         if tool_def.is_read_only:
             cached_res = self.memory.get_cached_tool_result(name, args)

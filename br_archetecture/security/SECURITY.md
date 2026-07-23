@@ -2,7 +2,7 @@
 
 > **Document Status**: Production Architecture Specification  
 > **Subsystem**: Guardian Core, PathPolicy, Permission Modes & RedTeaming  
-> **Module Path**: `guardian/`, `permissions.py`, `redteam/`  
+> **Module Path**: `guardian/`, `permissions.py`, `tools/redteam_tools.py`  
 
 ---
 

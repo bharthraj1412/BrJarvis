@@ -33,7 +33,7 @@ class ContextEngine:
         self,
         conversation_history: Optional[list] = None,
         active_goal: Optional[str] = None,
-        max_tokens: int = 8192,
+        max_tokens: int = 128000,
     ) -> AssembledContext:
         """Convenience method to construct full system context payload."""
         builder = self.create_builder(max_tokens=max_tokens)
