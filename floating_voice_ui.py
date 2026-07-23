@@ -58,7 +58,8 @@ C = {
 class FloatingGeminiVoiceUI:
     """Crystal-Pixel Floating Gemini Live Voice Overlay Application."""
 
-    def __init__(self):
+    def __init__(self, assistant_ref=None):
+        self.assistant = assistant_ref
         self.root = tk.Tk()
         self.root.title("BR JARVIS — Crystal-Pixel Voice Overlay")
         self.root.overrideredirect(True)  # Frameless
@@ -69,7 +70,8 @@ class FloatingGeminiVoiceUI:
         try:
             from ctypes import windll, byref, c_int
             hwnd = windll.user32.GetParent(self.root.winfo_id())
-            windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, byref(c_int(1)), 4)
+            if hwnd:
+                windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, byref(c_int(1)), 4)
         except Exception:
             pass
 
@@ -93,6 +95,7 @@ class FloatingGeminiVoiceUI:
         self.voice_state = "LISTENING"  # IDLE, LISTENING, THINKING, SPEAKING, MUTED
         self.tick = 0
         self.mic_volume = 0.1  # RMS mic input volume (0.0 to 1.0)
+        self._running = True
 
         # Audio Stream Thread
         if HAS_SD:
@@ -112,7 +115,7 @@ class FloatingGeminiVoiceUI:
         def stream_loop():
             try:
                 with sd.InputStream(callback=audio_callback, channels=1, samplerate=16000, blocksize=1024):
-                    while True:
+                    while self._running:
                         time.sleep(0.1)
             except Exception:
                 pass
@@ -260,6 +263,8 @@ class FloatingGeminiVoiceUI:
 
     def toggle_mic(self):
         self.is_muted = not self.is_muted
+        if self.assistant and hasattr(self.assistant, "ui"):
+            self.assistant.ui.muted = self.is_muted
         if self.is_muted:
             self.mic_btn.config(bg=C["red"], text="🔇")
             self.state_lbl.config(text="MUTED", fg=C["red"])
@@ -280,6 +285,8 @@ class FloatingGeminiVoiceUI:
 
     def trigger_barge_in(self):
         """Immediately stop TTS speech and revert to listening mode."""
+        if self.assistant and hasattr(self.assistant, "tts") and self.assistant.tts:
+            self.assistant.tts.stop()
         self.voice_state = "LISTENING"
         self.state_lbl.config(text="LISTENING", fg=C["cyan"])
         self.transcript_lbl.config(text="⚡ Interrupted! Listening for new speech...")

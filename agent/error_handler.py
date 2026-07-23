@@ -1,4 +1,8 @@
+# agent/error_handler.py — Automated Error Recovery & Reflection for JARVIS MK37
+from __future__ import annotations
+
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -22,7 +26,7 @@ class ErrorDecision(Enum):
     ABORT       = "abort"    
 
 
-ERROR_ANALYST_PROMPT = """You are the error recovery module of MARK XXV AI assistant.
+ERROR_ANALYST_PROMPT = """You are the error recovery module of JARVIS MK37 AI assistant.
 
 A task step has failed. Analyze the error and decide what to do.
 
@@ -63,7 +67,6 @@ def _get_api_key() -> str:
     return ""
 
 
-
 def analyze_error(
     step: dict,
     error: str,
@@ -71,24 +74,21 @@ def analyze_error(
     max_attempts: int = 2
 ) -> dict:
     """
-    Analyzes a failed step and returns a recovery decision.
-
-    Args:
-        step         : The step dict that failed
-        error        : Error message/traceback
-        attempt      : Current attempt number
-        max_attempts : How many times we've already tried
-
-    Returns:
-        {
-            "decision": ErrorDecision,
-            "reason": str,
-            "fix_suggestion": str,
-            "max_retries": int,
-            "user_message": str
-        }
+    Analyzes a failed step and returns a recovery decision. Automatically logs
+    the failure lesson to the LessonStore to prevent future errors.
     """
-    from google import genai as _genai
+    # Auto-log failure lesson to LessonStore
+    try:
+        from memory.lessons import LessonStore
+        ls = LessonStore()
+        ls.add_lesson(
+            topic=f"Failed tool: {step.get('tool', 'unknown')}",
+            correction=f"Error in '{step.get('description', '')}': {error[:120]}",
+            source="executor_error_handler",
+            weight=1.5
+        )
+    except Exception:
+        pass
 
     if attempt >= max_attempts:
         print(f"[ErrorHandler] ⚠️ Max attempts reached for step {step.get('step')} — forcing replan")
@@ -100,7 +100,15 @@ def analyze_error(
             "user_message":  "Trying a different approach, sir."
         }
 
-    client = _genai.Client(api_key=_get_api_key())
+    api_key = _get_api_key()
+    if not api_key:
+        return {
+            "decision":      ErrorDecision.REPLAN,
+            "reason":        error[:100],
+            "fix_suggestion": "Retry using fallback search or alternative tool",
+            "max_retries":   1,
+            "user_message":  "Encountered an issue, adjusting approach, sir."
+        }
 
     prompt = f"""Failed step:
 Tool: {step.get('tool')}
@@ -114,13 +122,15 @@ Error:
 Attempt number: {attempt}"""
 
     try:
+        from google import genai as _genai
+        client = _genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
             config={"system_instruction": ERROR_ANALYST_PROMPT},
         )
-        text     = response.text.strip()
-        text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
+        text = response.text.strip()
+        text = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
 
         result = json.loads(text)
         decision_str = result.get("decision", "replan").lower()
@@ -131,7 +141,6 @@ Attempt number: {attempt}"""
             "abort":  ErrorDecision.ABORT,
         }
         result["decision"] = decision_map.get(decision_str, ErrorDecision.REPLAN)
-
 
         if step.get("critical") and result["decision"] == ErrorDecision.SKIP:
             result["decision"]     = ErrorDecision.REPLAN
@@ -154,13 +163,18 @@ Attempt number: {attempt}"""
 def generate_fix(step: dict, error: str, fix_suggestion: str) -> dict:
     """
     When decision is REPLAN and a fix suggestion exists,
-    generates a replacement step using generated_code as fallback.
-
-    Returns a modified step dict.
+    generates a replacement step using code execution.
     """
-    from google import genai as _genai
-
-    client = _genai.Client(api_key=_get_api_key())
+    api_key = _get_api_key()
+    if not api_key:
+        return {
+            "step":        step.get("step"),
+            "tool":        "web_search",
+            "description": f"Fallback search for: {step.get('description')}",
+            "parameters":  {"query": step.get("description", "")[:200]},
+            "depends_on":  step.get("depends_on", []),
+            "critical":    step.get("critical", False)
+        }
 
     prompt = f"""A task step failed. Generate a replacement step.
 
@@ -176,8 +190,10 @@ Write a Python script that accomplishes the same goal differently.
 Return ONLY the Python code, no explanation."""
 
     try:
+        from google import genai as _genai
+        client = _genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
         )
         code = response.text.strip()
@@ -201,9 +217,9 @@ Return ONLY the Python code, no explanation."""
         print(f"[ErrorHandler] ⚠️ Fix generation failed: {e}")
         return {
             "step":        step.get("step"),
-            "tool":        "generated_code",
-            "description": f"Fallback for: {step.get('description')}",
-            "parameters":  {"description": step.get("description", "")},
+            "tool":        "web_search",
+            "description": f"Fallback search for: {step.get('description')}",
+            "parameters":  {"query": step.get("description", "")[:200]},
             "depends_on":  step.get("depends_on", []),
             "critical":    step.get("critical", False)
         }

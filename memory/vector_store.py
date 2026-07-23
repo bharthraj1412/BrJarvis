@@ -1,7 +1,8 @@
-# memory/vector_store.py
+# memory/vector_store.py — ChromaDB-backed Vector Memory for JARVIS MK37
 """
 ChromaDB-backed vector memory for JARVIS MK37.
-Uses Gemini API for fast embeddings, with a pure-Python TF-IDF similarity fallback if ChromaDB is missing.
+Uses Google GenAI API for fast embeddings (text-embedding-004),
+with a pure-Python TF-IDF similarity fallback if ChromaDB or API is missing.
 """
 from __future__ import annotations
 
@@ -29,11 +30,11 @@ except ImportError:
 
 
 class GeminiEmbeddingFunction(_BaseClass):
-    """ChromaDB embedding function using Gemini Client."""
+    """ChromaDB embedding function using modern Google GenAI Client (text-embedding-004)."""
     def __init__(self, api_key: str):
         self.api_key = api_key
         self._client = None
-        self.model = "gemini-embedding-001"
+        self.model = "text-embedding-004"
 
     @staticmethod
     def name() -> str:
@@ -61,8 +62,17 @@ class GeminiEmbeddingFunction(_BaseClass):
                 val = res.embeddings[0].values
                 embeddings.append(val)
             except Exception as e:
-                print(f"[VectorMemory] Embedding generation warning: {e}")
-                embeddings.append([0.0] * 768)
+                # Fallback model attempt if text-embedding-004 fails
+                try:
+                    res = self.client.models.embed_content(
+                        model="models/embedding-001",
+                        contents=text
+                    )
+                    val = res.embeddings[0].values
+                    embeddings.append(val)
+                except Exception as inner_e:
+                    print(f"[VectorMemory] Embedding generation warning: {e} / {inner_e}")
+                    embeddings.append([0.0] * 768)
         return embeddings
 
 
@@ -102,7 +112,7 @@ class TextSimilarityMemory:
     def _save(self):
         try:
             self.filepath.parent.mkdir(parents=True, exist_ok=True)
-            self.filepath.write_text(json.dumps(self.entries, indent=2), encoding="utf-8")
+            self.filepath.write_text(json.dumps(self.entries, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception:
             pass
 
@@ -138,28 +148,18 @@ class TextSimilarityMemory:
                 idf = math.log((1 + len(self.entries)) / (1 + df)) + 1.0
                 score += math.log(1 + tf) * idf
 
-            if "embedding" in e.get("metadata", {}):
-                try:
-                    from core.native_bridge import native_fast
-                    v1 = e["metadata"]["embedding"]
-                    if isinstance(v1, list) and len(v1) > 0:
-                        score += float(native_fast.fast_fnv1a_hash(str(v1[:10]).encode()) % 10) / 100.0
-                except Exception:
-                    pass
-                
             if score > 0:
                 ranked.append((score, e["text"]))
 
         ranked.sort(reverse=True)
         if not ranked:
-            # Fallback: return recent items
             return [e["text"] for e in self.entries[:n]]
         return [text for _, text in ranked[:n]]
 
 
 class VectorMemory:
     """
-    Unified vector memory. Uses ChromaDB with Gemini Embeddings when available,
+    Unified vector memory. Uses ChromaDB with Gemini Embeddings (text-embedding-004) when available,
     and falls back gracefully to a pure-Python TF-IDF similarity store otherwise.
     """
 
@@ -201,9 +201,16 @@ class VectorMemory:
 
         if self._collection:
             try:
-                # Dedup check via query
+                # Safe deduplication check
                 existing = self._collection.query(query_texts=[text], n_results=1)
-                if existing and existing["documents"] and existing["documents"][0]:
+                if (
+                    existing 
+                    and "documents" in existing 
+                    and existing["documents"] 
+                    and len(existing["documents"]) > 0
+                    and existing["documents"][0]
+                    and len(existing["documents"][0]) > 0
+                ):
                     if existing["documents"][0][0].strip() == text.strip():
                         return  # Dedup matched
                 
@@ -230,7 +237,9 @@ class VectorMemory:
                     query_texts=[query],
                     n_results=min(n, count),
                 )
-                return results["documents"][0] if results.get("documents") else []
+                if results and "documents" in results and results["documents"] and results["documents"][0]:
+                    return results["documents"][0]
+                return []
             except Exception as e:
                 print(f"[VectorMemory] ⚠️ recall() failed: {e}")
                 return []

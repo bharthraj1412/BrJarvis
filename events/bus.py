@@ -5,7 +5,9 @@ import asyncio
 import fnmatch
 import inspect
 import logging
-from typing import Awaitable, Callable, Dict, List, Optional, Union
+import re
+import threading
+from typing import Awaitable, Callable, Dict, List, Optional, Union, Any
 from events.store import EventStore
 from events.types import BaseEvent, ErrorEvent
 
@@ -20,22 +22,34 @@ class EventBus:
     def __init__(self, store: Optional[EventStore] = None):
         self.store: EventStore = store or EventStore()
         self._subscribers: Dict[str, List[EventHandler]] = {}
+        self._sub_lock: threading.Lock = threading.Lock()
         self._dlq: List[Dict[str, Any]] = []
 
     def subscribe(self, topic_pattern: str, handler: EventHandler) -> None:
         """Subscribe a callback to a topic or wildcard pattern (e.g. 'system.*', 'task.#')."""
-        if topic_pattern not in self._subscribers:
-            self._subscribers[topic_pattern] = []
-        if handler not in self._subscribers[topic_pattern]:
-            self._subscribers[topic_pattern].append(handler)
-            logger.debug(f"EventBus: Registered subscriber for topic pattern '{topic_pattern}'")
+        with self._sub_lock:
+            if topic_pattern not in self._subscribers:
+                self._subscribers[topic_pattern] = []
+            if handler not in self._subscribers[topic_pattern]:
+                self._subscribers[topic_pattern].append(handler)
+                logger.debug(f"EventBus: Registered subscriber for topic pattern '{topic_pattern}'")
 
     def unsubscribe(self, topic_pattern: str, handler: EventHandler) -> bool:
         """Unsubscribe a callback handler."""
-        if topic_pattern in self._subscribers and handler in self._subscribers[topic_pattern]:
-            self._subscribers[topic_pattern].remove(handler)
+        with self._sub_lock:
+            if topic_pattern in self._subscribers and handler in self._subscribers[topic_pattern]:
+                self._subscribers[topic_pattern].remove(handler)
+                return True
+            return False
+
+    def _match_topic(self, topic: str, pattern: str) -> bool:
+        """Match topic against pattern using fnmatch or regex wildcard rules."""
+        if topic == pattern or pattern == "*":
             return True
-        return False
+        if fnmatch.fnmatch(topic, pattern):
+            return True
+        regex = "^" + pattern.replace(".", r"\.").replace("*", r"[^.]+").replace("#", r".*") + "$"
+        return bool(re.match(regex, topic))
 
     async def publish_async(self, event: BaseEvent) -> None:
         """Publish an event asynchronously to all matching subscriber callbacks."""
@@ -43,11 +57,11 @@ class EventBus:
         logger.debug(f"📢 EventBus Publish: {event.topic} (ID: {event.event_id[:8]})")
 
         matching_handlers: List[EventHandler] = []
-        for pattern, handlers in self._subscribers.items():
-            # Wildcard matching support
-            regex_pattern = pattern.replace(".", "\\.").replace("*", "[^.]+").replace("#", ".*")
-            if fnmatch.fnmatch(event.topic, pattern) or fnmatch.fnmatch(event.topic, regex_pattern):
-                matching_handlers.extend(handlers)
+        with self._sub_lock:
+            for pattern, handlers in self._subscribers.items():
+                if self._match_topic(event.topic, pattern):
+                    matching_handlers.extend(handlers)
+
         for handler in matching_handlers:
             try:
                 if inspect.iscoroutinefunction(handler):

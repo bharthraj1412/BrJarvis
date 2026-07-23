@@ -140,6 +140,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="JARVIS MK37 Core Server", version="37.0", lifespan=lifespan)
 
+# Add API Key check
+SERVER_API_KEY = os.environ.get("JARVIS_SERVER_API_KEY")
+if not SERVER_API_KEY:
+    try:
+        cfg_path = Path(__file__).parent / "config" / "api_keys.json"
+        if cfg_path.exists():
+            data = json.loads(cfg_path.read_text(encoding="utf-8"))
+            SERVER_API_KEY = data.get("server_api_key")
+    except Exception:
+        pass
+
 # Enable CORS for cross-origin dashboard hosting
 app.add_middleware(
     CORSMiddleware,
@@ -148,6 +159,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.middleware("http")
+async def verify_api_key(request: Request, call_next):
+    if SERVER_API_KEY:
+        # Expose non-API endpoints like index, static docs
+        if request.url.path.startswith(("/api", "/v1")) and request.url.path not in ("/api/health", "/health"):
+            auth_header = request.headers.get("Authorization")
+            api_key_header = request.headers.get("X-API-Key")
+            token = None
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+            elif api_key_header:
+                token = api_key_header
+            if token != SERVER_API_KEY:
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized: Invalid API Key"})
+    return await call_next(request)
 
 
 # ── API Models ──────────────────────────────────────────────────────────────
@@ -516,6 +546,13 @@ async def _safe_ws_send(ws: WebSocket, data: dict) -> bool:
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    if SERVER_API_KEY:
+        token = websocket.query_params.get("token")
+        if token != SERVER_API_KEY:
+            await websocket.accept()
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+
     await websocket.accept()
     async with WEBSOCKETS_LOCK:
         ACTIVE_WEBSOCKETS.add(websocket)

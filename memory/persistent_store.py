@@ -1,7 +1,7 @@
-# memory/persistent_store.py
+# memory/persistent_store.py — Extended Persistent Storage for JARVIS MK37
 """
 File-based persistent memory storage with user-level and project-level scopes.
-Ported from the Claude Code collection for JARVIS MK37.
+Ported & enhanced for JARVIS MK37.
 
 Storage layout:
   user scope    : ~/.jarvis/memory/<slug>.md
@@ -10,14 +10,18 @@ Storage layout:
 MEMORY.md in each directory is the index file — rebuilt automatically after
 every save/delete.
 
-Optional ChromaDB vector embeddings for semantic similarity search.
-Falls back to keyword search if chromadb is not installed.
+Synchronizes across:
+  - Flat Markdown Files with YAML Frontmatter
+  - SQLite Relational Database (`memory.db`)
+  - ChromaDB / TF-IDF Vector Embeddings
 """
 from __future__ import annotations
 
 import re
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 # ── Paths ──────────────────────────────────────────────────────────────────
@@ -45,7 +49,7 @@ def get_memory_dir(scope: str = "user") -> Path:
 
 @dataclass
 class MemoryEntry:
-    """A single memory entry loaded from a .md file."""
+    """A single memory entry loaded from a .md file or SQLite DB."""
     name: str
     description: str
     type: str                   # "user" | "feedback" | "project" | "reference"
@@ -69,7 +73,7 @@ def _slugify(name: str) -> str:
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
-    """Parse ---\\nkey: value\\n---\\nbody format."""
+    """Parse ---\nkey: value\n---\nbody format."""
     if not text.startswith("---"):
         return {}, text
     parts = text.split("---", 2)
@@ -105,30 +109,15 @@ def _format_entry_md(entry: MemoryEntry) -> str:
     return "\n".join(lines) + "\n"
 
 
-# ── Core storage operations ────────────────────────────────────────────────
+# ── SQLite Database Setup ──────────────────────────────────────────────────
 
-def _backup_version(file_path: Path):
-    """Save a historical version of the file before overwrite."""
-    try:
-        if not file_path.exists():
-            return
-        history_dir = file_path.parent / ".history"
-        history_dir.mkdir(exist_ok=True)
-        mtime = file_path.stat().st_mtime
-        from datetime import datetime as dt
-        timestamp = dt.fromtimestamp(mtime).strftime("%Y%m%d_%H%M%S")
-        history_file = history_dir / f"{file_path.stem}_{timestamp}.md"
-        history_file.write_text(file_path.read_text(encoding="utf-8"), encoding="utf-8")
-    except Exception:
-        pass
-
-
-def _get_sqlite_conn(scope: str = "user"):
-    import sqlite3
+def _get_sqlite_conn(scope: str = "user") -> sqlite3.Connection:
     db_dir = get_memory_dir(scope)
     db_dir.mkdir(parents=True, exist_ok=True)
     db_path = db_dir / "memory.db"
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS memories (
             id TEXT PRIMARY KEY,
@@ -145,6 +134,8 @@ def _get_sqlite_conn(scope: str = "user"):
             file_path TEXT
         )
     """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_name ON memories(name)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type)")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS memory_versions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,6 +147,22 @@ def _get_sqlite_conn(scope: str = "user"):
     """)
     conn.commit()
     return conn
+
+
+def _backup_version(file_path: Path):
+    """Save a historical version of the file before overwrite."""
+    try:
+        if not file_path.exists():
+            return
+        history_dir = file_path.parent / ".history"
+        history_dir.mkdir(exist_ok=True)
+        mtime = file_path.stat().st_mtime
+        from datetime import datetime as dt
+        timestamp = dt.fromtimestamp(mtime).strftime("%Y%m%d_%H%M%S")
+        history_file = history_dir / f"{file_path.stem}_{timestamp}.md"
+        history_file.write_text(file_path.read_text(encoding="utf-8"), encoding="utf-8")
+    except Exception:
+        pass
 
 
 # ── Core storage operations ────────────────────────────────────────────────
@@ -179,7 +186,6 @@ def save_memory(entry: MemoryEntry, scope: str = "user") -> None:
     # Sync to SQLite
     try:
         conn = _get_sqlite_conn(scope)
-        # Check if exists to store in versions
         cursor = conn.cursor()
         cursor.execute("SELECT content, description FROM memories WHERE name = ?", (entry.name,))
         row = cursor.fetchone()
@@ -272,12 +278,10 @@ def search_memory(query: str, scope: str = "all") -> list[MemoryEntry]:
     if not all_entries:
         return []
 
-    # Build a set of valid entry names from disk (ground truth)
     valid_names = {e.name for e in all_entries}
 
     # Attempt vector search first
     vector_results = _vector_search(query, all_entries, top_k=10)
-    # Filter vector results to only include entries that exist on disk
     vector_results = [e for e in vector_results if e.name in valid_names]
     if vector_results:
         return vector_results
@@ -357,14 +361,13 @@ def _remove_from_vector(name: str):
 
 
 def _vector_search(query: str, all_entries: list[MemoryEntry], top_k: int = 10) -> list[MemoryEntry]:
-    """Search using ChromaDB vector similarity. Returns empty list if unavailable."""
+    """Search using ChromaDB vector similarity."""
     coll = _get_chroma_collection()
     if coll is None:
         return []
     try:
         count = coll.count()
         if count == 0:
-            # Seed the vector store from existing entries
             for e in all_entries:
                 _sync_to_vector(e)
             count = coll.count()
@@ -373,12 +376,12 @@ def _vector_search(query: str, all_entries: list[MemoryEntry], top_k: int = 10) 
         results = coll.query(query_texts=[query], n_results=min(top_k, count))
         if not results or not results["ids"] or not results["ids"][0]:
             return []
-        # Map vector results back to MemoryEntry objects and filter by distance threshold
+        
         entry_map = {_slugify(e.name): e for e in all_entries}
         matched = []
         if "distances" in results and results["distances"] and results["distances"][0]:
             for slug, dist in zip(results["ids"][0], results["distances"][0]):
-                if dist <= 0.60:
+                if dist <= 0.45:  # ⚡ Strict cosine distance cutoff (0=identical, <0.45=relevant)
                     if slug in entry_map:
                         matched.append(entry_map[slug])
         else:

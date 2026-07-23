@@ -1,19 +1,20 @@
-# history/audit_writer.py
+# history/audit_writer.py — Structured & Rotated JSON Audit Writer for JARVIS MK37
 """
 Structured JSON audit writer for JARVIS MK37.
-
-Replaces the old plain-text audit.log with a structured JSONL format
-while maintaining a parallel human-readable log for grep compatibility.
 
 Writes to:
   ~/.jarvis/history/audit.jsonl  — structured JSON Lines (machine-readable)
   ~/.jarvis/audit.log            — human-readable plain text (grep-friendly)
 
-Thread-safe: all writes go through a threading.Lock().
+Features:
+  - Thread-safe writes via threading.Lock()
+  - Safe JSON argument truncation without decode syntax errors
+  - Automatic log rotation (10 MB cap per log file, max 3 backups)
 """
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -23,6 +24,8 @@ from typing import Any
 
 _JSONL_PATH = Path.home() / ".jarvis" / "history" / "audit.jsonl"
 _PLAINTEXT_PATH = Path.home() / ".jarvis" / "audit.log"
+_MAX_LOG_BYTES = 10 * 1024 * 1024  # 10 MB per file
+_MAX_BACKUPS = 3
 _lock = threading.Lock()
 
 # Module-level session_id — set by the orchestrator on session start
@@ -33,6 +36,48 @@ def set_session_id(session_id: str) -> None:
     """Set the current session ID for audit entries."""
     global _current_session_id
     _current_session_id = session_id
+
+
+def _rotate_if_needed(file_path: Path) -> None:
+    """Rotate log file if size exceeds _MAX_LOG_BYTES."""
+    try:
+        if not file_path.exists() or file_path.stat().st_size < _MAX_LOG_BYTES:
+            return
+        
+        for i in range(_MAX_BACKUPS - 1, 0, -1):
+            s_file = file_path.with_name(f"{file_path.name}.{i}")
+            d_file = file_path.with_name(f"{file_path.name}.{i + 1}")
+            if s_file.exists():
+                if d_file.exists():
+                    d_file.unlink()
+                s_file.rename(d_file)
+        
+        target = file_path.with_name(f"{file_path.name}.1")
+        if target.exists():
+            target.unlink()
+        file_path.rename(target)
+    except Exception:
+        pass
+
+
+def _truncate_args(args: Any, max_len: int = 500) -> Any:
+    """Safely truncate arguments for audit storage without JSON syntax errors."""
+    if args is None:
+        return None
+    if isinstance(args, (int, float, bool)):
+        return args
+    if isinstance(args, dict):
+        truncated = {}
+        for k, v in list(args.items())[:15]:
+            truncated[str(k)] = _truncate_args(v, max_len=100)
+        return truncated
+    if isinstance(args, list):
+        return [_truncate_args(item, max_len=50) for item in args[:10]]
+    
+    s = str(args)
+    if len(s) > max_len:
+        return s[:max_len] + "..."
+    return s
 
 
 def write_audit(
@@ -47,7 +92,7 @@ def write_audit(
 
     Args:
         tool:       name of the tool that was invoked
-        args:       tool arguments (dict or string, truncated for storage)
+        args:       tool arguments (dict or string, safely truncated)
         decision:   authorization decision (ALLOWED, DENIED, CONFIRMED, etc.)
         latency_ms: execution time in milliseconds
         error:      error message if the tool call failed, or None
@@ -56,20 +101,7 @@ def write_audit(
     sid = session_id or _current_session_id
     now = datetime.now(tz=timezone.utc)
 
-    # Truncate args for storage
-    args_truncated: dict | str | None = None
-    if args is not None:
-        if isinstance(args, dict):
-            try:
-                args_str = json.dumps(args, default=str)
-                if len(args_str) > 500:
-                    args_truncated = json.loads(args_str[:500] + "}")
-                else:
-                    args_truncated = args
-            except (TypeError, ValueError, json.JSONDecodeError):
-                args_truncated = str(args)[:500]
-        else:
-            args_truncated = str(args)[:500]
+    args_truncated = _truncate_args(args)
 
     # Build the JSONL entry
     entry = {
@@ -88,7 +120,7 @@ def write_audit(
     if args_truncated:
         try:
             args_summary = json.dumps(args_truncated, default=str)[:200]
-        except (TypeError, ValueError):
+        except Exception:
             args_summary = str(args_truncated)[:200]
 
     plain_line = f"[{timestamp_str}] {decision:20s} | {tool:25s} | {args_summary}"
@@ -100,13 +132,15 @@ def write_audit(
 
     with _lock:
         try:
+            _rotate_if_needed(_JSONL_PATH)
             _JSONL_PATH.parent.mkdir(parents=True, exist_ok=True)
             with open(_JSONL_PATH, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, default=str) + "\n")
+                f.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
         except Exception:
             pass  # Audit logging must never crash the system
 
         try:
+            _rotate_if_needed(_PLAINTEXT_PATH)
             _PLAINTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
             with open(_PLAINTEXT_PATH, "a", encoding="utf-8") as f:
                 f.write(plain_line)

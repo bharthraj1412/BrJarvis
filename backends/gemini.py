@@ -66,7 +66,9 @@ class GeminiBackend(BaseBackend):
                 from config.models import get_model_config
                 cfg = get_model_config()
                 base_url = cfg.get("openai_base_url", "http://localhost:8045/v1")
-                api_key_val = os.environ.get("OPENAI_API_KEY", "sk-5ec70bf9fa324084b7a7326babf52c45").strip()
+                api_key_val = os.environ.get("OPENAI_API_KEY", "").strip()
+                if not api_key_val:
+                    raise ValueError("OPENAI_API_KEY env var required for proxy gateway")
                 self._client = OpenAI(base_url=base_url, api_key=api_key_val)
                 self._use_openai_client = True
                 self.model = model or self._pick_model()
@@ -159,13 +161,16 @@ class GeminiBackend(BaseBackend):
                 )
                 return response.text or ""
             except Exception as e:
-                if "quota" in str(e).lower() or "rate" in str(e).lower():
-                    print(f"[Gemini] Rate limit on {target_model}, waiting 5s...")
-                    time.sleep(5)
+                err_str = str(e).lower()
+                if "quota" in err_str or "rate" in err_str or "429" in err_str:
+                    import random
+                    backoff = min(60, (2 ** attempt) + random.uniform(0, 1))
+                    print(f"[Gemini] Rate limit on {target_model}, backoff {backoff:.1f}s...")
+                    time.sleep(backoff)
                 if attempt == len(self.FALLBACK_MODELS) - 1:
                     raise
                 print(f"[Gemini] Model {target_model} failed: {e} — trying next...")
-                time.sleep(1)
+                time.sleep(0.5)
 
         return ""
 

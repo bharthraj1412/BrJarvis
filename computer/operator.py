@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import shutil
 import subprocess
 import sys
 import time
@@ -64,13 +66,36 @@ class ComputerOperator:
                 if _PYAUTOGUI_AVAILABLE and action.x is not None and action.y is not None:
                     pyautogui.click(action.x, action.y)
 
+            elif action.action_type == ActionType.DOUBLE_CLICK:
+                if _PYAUTOGUI_AVAILABLE and action.x is not None and action.y is not None:
+                    pyautogui.doubleClick(action.x, action.y)
+
+            elif action.action_type == ActionType.RIGHT_CLICK:
+                if _PYAUTOGUI_AVAILABLE and action.x is not None and action.y is not None:
+                    pyautogui.rightClick(action.x, action.y)
+
             elif action.action_type == ActionType.MOUSE_MOVE:
                 if _PYAUTOGUI_AVAILABLE and action.x is not None and action.y is not None:
                     pyautogui.moveTo(action.x, action.y)
 
+            elif action.action_type == ActionType.MOUSE_SCROLL:
+                if _PYAUTOGUI_AVAILABLE:
+                    clicks = action.scroll_clicks if action.scroll_clicks != 0 else 5
+                    pyautogui.scroll(clicks, x=action.x, y=action.y)
+
+            elif action.action_type == ActionType.DRAG_AND_DROP:
+                if _PYAUTOGUI_AVAILABLE and action.x is not None and action.y is not None and action.target_x is not None and action.target_y is not None:
+                    pyautogui.moveTo(action.x, action.y)
+                    pyautogui.dragTo(action.target_x, action.target_y, duration=0.5)
+
             elif action.action_type == ActionType.KEYBOARD_TYPE:
                 if _PYAUTOGUI_AVAILABLE and action.text:
                     pyautogui.typewrite(action.text, interval=0.01)
+
+            elif action.action_type == ActionType.KEYBOARD_PRESS:
+                if _PYAUTOGUI_AVAILABLE and action.keys:
+                    for k in action.keys:
+                        pyautogui.press(k)
 
             elif action.action_type == ActionType.HOTKEY:
                 if _PYAUTOGUI_AVAILABLE and action.keys:
@@ -96,9 +121,17 @@ class ComputerOperator:
                     clip_text = self._clipboard_buffer
                 return ActionResult(action_id=action.action_id, success=True, data=clip_text)
 
+            elif action.action_type == ActionType.TAKE_SCREENSHOT:
+                report = self.vision.analyze_screen(force_refresh=True)
+                return ActionResult(
+                    action_id=action.action_id,
+                    success=True,
+                    verification_message=f"Screenshot captured ({report.screen_width}x{report.screen_height})",
+                    data=report.image_path
+                )
+
             elif action.action_type in (ActionType.WINDOW_FOCUS, ActionType.APP_FOCUS):
                 success = self.focus_window(action.text or "")
-                # If focus_window returns False (e.g. in test env), treat as completed attempt
                 return ActionResult(
                     action_id=action.action_id,
                     success=True,
@@ -132,7 +165,7 @@ class ComputerOperator:
         return await loop.run_in_executor(None, self.execute_action, action)
 
     def focus_window(self, title_query: str) -> bool:
-        """Attempt to focus a window matching title substring."""
+        """Attempt to focus a window matching title substring across Windows, macOS, or Linux."""
         if not title_query:
             return False
 
@@ -140,8 +173,6 @@ class ComputerOperator:
             try:
                 import ctypes
                 user32 = ctypes.windll.user32
-                
-                # Find matching window handle
                 found_hwnd = None
                 
                 def enum_windows_callback(hwnd, extra):
@@ -165,6 +196,22 @@ class ComputerOperator:
             except Exception as e:
                 logger.debug(f"win32 window focus failed: {e}")
 
+        elif sys.platform == "darwin":
+            try:
+                cmd = f'tell application "System Events" to set frontmost of first process whose name contains "{title_query}" to true'
+                subprocess.run(["osascript", "-e", cmd], capture_output=True, timeout=3)
+                return True
+            except Exception:
+                pass
+
+        elif sys.platform.startswith("linux"):
+            if shutil.which("wmctrl"):
+                try:
+                    subprocess.run(["wmctrl", "-a", title_query], capture_output=True, timeout=3)
+                    return True
+                except Exception:
+                    pass
+
         return False
 
     def click(self, x: int, y: int, description: str = "") -> ActionResult:
@@ -174,6 +221,37 @@ class ComputerOperator:
             x=x,
             y=y,
             description=description or f"Click at ({x}, {y})",
+        )
+        return self.execute_action(action)
+
+    def double_click(self, x: int, y: int, description: str = "") -> ActionResult:
+        """Convenience method to double-click screen coordinates."""
+        action = ComputerAction(
+            action_type=ActionType.DOUBLE_CLICK,
+            x=x,
+            y=y,
+            description=description or f"Double-click at ({x}, {y})",
+        )
+        return self.execute_action(action)
+
+    def right_click(self, x: int, y: int, description: str = "") -> ActionResult:
+        """Convenience method to right-click screen coordinates."""
+        action = ComputerAction(
+            action_type=ActionType.RIGHT_CLICK,
+            x=x,
+            y=y,
+            description=description or f"Right-click at ({x}, {y})",
+        )
+        return self.execute_action(action)
+
+    def scroll(self, clicks: int, x: Optional[int] = None, y: Optional[int] = None, description: str = "") -> ActionResult:
+        """Convenience method to scroll mouse wheel."""
+        action = ComputerAction(
+            action_type=ActionType.MOUSE_SCROLL,
+            x=x,
+            y=y,
+            scroll_clicks=clicks,
+            description=description or f"Scroll {clicks} clicks",
         )
         return self.execute_action(action)
 

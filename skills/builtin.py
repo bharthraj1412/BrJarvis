@@ -156,6 +156,40 @@ $ARGUMENTS
 """
 
 
+_AUDIT_PROMPT = """\
+Perform an exhaustive code audit of the workspace or target directory.
+
+## Steps
+1. Use `code_refactor` (action="analyze_ast") or `file_list` to inspect workspace structure.
+2. Check for syntax errors, bare exceptions, unused imports, or security anti-patterns.
+3. Generate a structured audit report summarizing code health, complexity, and refactoring targets.
+
+User context: $ARGUMENTS
+"""
+
+_OPTIMIZE_PROMPT = """\
+Audit and optimize operating system performance and memory allocation.
+
+## Steps
+1. Run `system_diagnostic` (aspect="full_summary") and aspect="top_processes" to check RAM/CPU.
+2. Run `system_cleanup` or identify temporary log files / cache files to purge.
+3. Summarize memory reclaimed and system health metrics.
+
+User context: $ARGUMENTS
+"""
+
+_TESTRUN_PROMPT = """\
+Discover and run unit test suites in the workspace.
+
+## Steps
+1. Search for test files using `file_list` or `batch_file_ops`.
+2. Run tests via `run_code` or pytest CLI.
+3. Report test status, passed/failed counts, and error tracebacks.
+
+User context: $ARGUMENTS
+"""
+
+
 def _register_builtins() -> None:
     """Register all built-in skills."""
 
@@ -244,6 +278,48 @@ def _register_builtins() -> None:
         prompt=_WEB_RESEARCH_PROMPT,
         file_path="<builtin>",
         when_to_use="Use when the user wants comprehensive research on a topic.",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="audit",
+        description="Perform comprehensive codebase security, AST structure, and dead code analysis",
+        triggers=["/audit", "/code-audit"],
+        tools=["code_refactor", "file_list", "file_read"],
+        prompt=_AUDIT_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use when auditing codebase quality or searching for vulnerabilities.",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="optimize",
+        description="Optimize system performance, reclaim memory, and clean cache",
+        triggers=["/optimize", "/clean-system"],
+        tools=["system_diagnostic", "system_cleanup"],
+        prompt=_OPTIMIZE_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use when tuning operating system performance or cleaning system memory.",
+        arguments=[],
+        user_invocable=True,
+        context="inline",
+        source="builtin",
+    ))
+
+    register_builtin_skill(SkillDef(
+        name="testrun",
+        description="Discover, execute, and report results for project test suites",
+        triggers=["/testrun", "/run-tests"],
+        tools=["run_code", "file_list", "batch_file_ops"],
+        prompt=_TESTRUN_PROMPT,
+        file_path="<builtin>",
+        when_to_use="Use when running automated tests across the workspace.",
         arguments=[],
         user_invocable=True,
         context="inline",

@@ -1,11 +1,11 @@
-# memory/memory_context.py
+# memory/memory_context.py — Memory & Lessons System Prompt Injector
 """
 Memory context building for system prompt injection.
-Ported from the Claude Code collection for JARVIS MK37.
+Ported & enhanced for JARVIS MK37.
 
 Provides:
-  get_memory_context()      — full context string for system prompt
-  find_relevant_memories()  — keyword relevance filtering
+  get_memory_context()      — full context string for system prompt (with MEMORY.md + Lessons)
+  find_relevant_memories()  — keyword & vector relevance filtering
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from memory.persistent_store import (
 )
 from memory.memory_scan import scan_all_memories, memory_freshness_text
 from memory.memory_types import MEMORY_SYSTEM_PROMPT
+from memory.lessons import LessonStore
 
 
 # ── Index truncation ───────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ def truncate_index_content(raw: str) -> str:
 def get_memory_context(include_guidance: bool = False) -> str:
     """Return memory context for injection into the system prompt.
 
-    Combines user-level and project-level MEMORY.md content (if present).
+    Combines user-level and project-level MEMORY.md content + top active lessons/corrections.
     Returns empty string when no memories exist.
     """
     parts: list[str] = []
@@ -75,6 +76,16 @@ def get_memory_context(include_guidance: bool = False) -> str:
     if proj_content:
         truncated = truncate_index_content(proj_content)
         parts.append(f"[Project memories]\n{truncated}")
+
+    # Inject top user lessons/corrections
+    try:
+        lessons_store = LessonStore()
+        top_lessons = lessons_store.get_latest_lessons(limit=5)
+        if top_lessons:
+            lesson_lines = [f"- {l['topic']}: {l['correction']}" for l in top_lessons]
+            parts.append("[Learned Lessons & User Corrections]\n" + "\n".join(lesson_lines))
+    except Exception:
+        pass
 
     if not parts:
         return ""
@@ -91,7 +102,7 @@ def find_relevant_memories(
     query: str,
     max_results: int = 5,
 ) -> list[dict]:
-    """Find memories relevant to a query via keyword matching.
+    """Find memories relevant to a query via keyword & vector matching.
 
     Returns:
         List of dicts with keys: name, description, type, scope, content,

@@ -35,19 +35,37 @@ class SemanticComputerOperator:
 
     def click_component(self, target: SemanticTarget) -> ActionResult:
         """Resolve a semantic component target to coordinates and execute click."""
+        return self._execute_semantic_action(target, ActionType.MOUSE_CLICK)
+
+    def double_click_component(self, target: SemanticTarget) -> ActionResult:
+        """Resolve a semantic component target to coordinates and execute double click."""
+        return self._execute_semantic_action(target, ActionType.DOUBLE_CLICK)
+
+    def right_click_component(self, target: SemanticTarget) -> ActionResult:
+        """Resolve a semantic component target to coordinates and execute right click."""
+        return self._execute_semantic_action(target, ActionType.RIGHT_CLICK)
+
+    def type_into_component(self, target: SemanticTarget, text: str) -> ActionResult:
+        """Click a target component to focus it, then type specified text."""
+        click_res = self.click_component(target)
+        if not click_res.success:
+            return click_res
+        return self.operator.type_text(text, description=f"Type into '{target.component_name}'")
+
+    def _execute_semantic_action(self, target: SemanticTarget, action_type: ActionType) -> ActionResult:
         report = self.vision.analyze_screen(force_refresh=True)
         graph = report.semantic_graph
 
         if not graph:
             err_msg = f"Failed to construct SemanticUIGraph for target '{target.component_name}'"
             logger.error(f"❌ {err_msg}")
-            return ActionResult(action_id="semantic_click", success=False, verification_message=err_msg)
+            return ActionResult(action_id="semantic_action", success=False, verification_message=err_msg)
 
         node = self._resolve_target_node(target, graph)
         if not node:
             err_msg = f"Could not locate semantic target component '{target.component_name}'"
             logger.warning(f"⚠️ {err_msg}")
-            return ActionResult(action_id="semantic_click", success=False, verification_message=err_msg)
+            return ActionResult(action_id="semantic_action", success=False, verification_message=err_msg)
 
         center_x = node.bbox.center_x
         center_y = node.bbox.center_y
@@ -58,10 +76,10 @@ class SemanticComputerOperator:
         )
 
         action = ComputerAction(
-            action_type=ActionType.MOUSE_CLICK,
+            action_type=action_type,
             x=center_x,
             y=center_y,
-            description=f"Click '{target.component_name}' at ({center_x}, {center_y})",
+            description=f"{action_type.value} '{target.component_name}' at ({center_x}, {center_y})",
         )
 
         return self.operator.execute_action(action)
@@ -69,8 +87,17 @@ class SemanticComputerOperator:
     def _resolve_target_node(
         self, target: SemanticTarget, graph: SemanticUIGraph
     ) -> Optional[SemanticUINode]:
-        """Find matching node in SemanticUIGraph."""
-        matches = graph.find_by_name(target.component_name)
+        """Find matching node in SemanticUIGraph with exact or fuzzy substring matching."""
+        target_clean = target.component_name.lower().strip()
+        matches = graph.find_by_name(target_clean)
+        
+        # Fuzzy match fallback if exact name match returns nothing
+        if not matches and graph.nodes:
+            matches = [
+                n for n in graph.nodes.values() 
+                if target_clean in n.name.lower() or n.name.lower() in target_clean
+            ]
+
         if target.role:
             matches = [m for m in matches if m.role == target.role]
 

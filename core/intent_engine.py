@@ -89,10 +89,27 @@ class DeterministicIntentEngine:
             except Exception as e:
                 pass
 
-        # 3. Match Excel Codebase Analysis Intent (Fuzzy/Typo resilient)
-        has_excel = any(w in clean for w in ["excel", "sheet", "workbook", "spreadsheet", "xls"])
-        has_analysis = any(w in clean for w in ["analy", "anali", "project", "poject", "report", "codebase", "summary", "audit"])
-        if has_excel and has_analysis:
+        # 3. Match Excel Codebase Analysis Intent — STRICT: only for JARVIS project analysis
+        #    Must explicitly mention the codebase/project analysis, NOT generic "report in excel"
+        has_excel = any(w in clean for w in ["excel", "spreadsheet", "xls"])
+        has_codebase_intent = any(phrase in clean for phrase in [
+            "codebase analysis", "codebase audit", "codebase report",
+            "project analysis", "project audit", "analyze project",
+            "analyse project", "analyze codebase", "analyse codebase",
+            "code audit", "code analysis", "source code report",
+            "architecture audit", "architecture report", "code summary",
+        ])
+        # Exclude generic data-creation requests (e.g., "accident report in excel")
+        has_data_request = any(w in clean for w in [
+            "accident", "dead", "death", "born", "birth", "sales", "revenue",
+            "employee", "student", "customer", "invoice", "inventory", "budget",
+            "expense", "salary", "attendance", "hospital", "medical", "patient",
+            "weather", "stock", "market", "financial", "population", "census",
+            "crime", "traffic", "pollution", "energy", "water", "food",
+            "2025", "2024", "2023", "monthly", "weekly", "daily", "yearly",
+            "quarterly", "annual", "detailed", "comprehensive",
+        ])
+        if has_excel and has_codebase_intent and not has_data_request:
             try:
                 from tools.excel_tools import analyze_project_to_excel
                 res_msg = analyze_project_to_excel({})
@@ -106,10 +123,16 @@ class DeterministicIntentEngine:
             except Exception as e:
                 pass
 
-        # 4. Match Product Analysis / Word / PDF Document Generation Intent
-        has_doc_type = any(w in clean for w in ["word", "pdf", "docx", "document", "open it"])
-        has_doc_topic = any(w in clean for w in ["product", "analis", "analys", "analise", "b.r.jarvis", "jarvis"])
-        if (has_doc_type and has_doc_topic) or clean in ("create pdf open it", "open pdf", "product analysis", "create pdf"):
+        # 4. Match JARVIS Product Analysis Document Generation Intent — STRICT
+        #    Only intercept explicit requests for JARVIS product analysis docs
+        has_doc_type = any(w in clean for w in ["word", "pdf", "docx"])
+        has_jarvis_product = any(phrase in clean for phrase in [
+            "product analysis", "product analys", "product report",
+            "b.r.jarvis", "jarvis product", "jarvis analysis",
+            "jarvis report", "project product",
+        ])
+        exact_commands = ("create pdf open it", "open pdf", "product analysis", "create pdf")
+        if (has_doc_type and has_jarvis_product and not has_data_request) or clean in exact_commands:
             try:
                 from tools.doc_tools import generate_project_product_analysis
                 res_msg = generate_project_product_analysis({})
@@ -168,10 +191,43 @@ class DeterministicIntentEngine:
             except Exception as e:
                 pass
 
-        # 6. Match System Control Intent (e.g., "mute volume", "take screenshot")
+        # 6. Match System & Audio Controls (Volume Up/Down/Mute, Play/Pause, Screenshot)
+        if any(w in clean for w in ["volume up", "increase volume", "louder"]):
+            try:
+                import pyautogui
+                pyautogui.FAILSAFE = False
+                for _ in range(5):
+                    pyautogui.press("volumeup")
+                return {
+                    "executed": True,
+                    "intent": "system_audio",
+                    "target": "volumeup",
+                    "result": "Increased system audio volume (0-Token Execution).",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        if any(w in clean for w in ["volume down", "decrease volume", "quieter"]):
+            try:
+                import pyautogui
+                pyautogui.FAILSAFE = False
+                for _ in range(5):
+                    pyautogui.press("volumedown")
+                return {
+                    "executed": True,
+                    "intent": "system_audio",
+                    "target": "volumedown",
+                    "result": "Decreased system audio volume (0-Token Execution).",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
         if clean in ("mute", "mute audio", "mute volume", "unmute"):
             try:
                 import pyautogui
+                pyautogui.FAILSAFE = False
                 pyautogui.press("volumemute")
                 return {
                     "executed": True,
@@ -179,6 +235,126 @@ class DeterministicIntentEngine:
                     "target": "volumemute",
                     "result": "Toggled system audio mute state (0-Token Execution).",
                     "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        if clean in ("play", "pause", "play pause", "pause media", "play media", "toggle playback"):
+            try:
+                import pyautogui
+                pyautogui.press("playpause")
+                return {
+                    "executed": True,
+                    "intent": "media_control",
+                    "target": "playpause",
+                    "result": "Toggled media playback (0-Token Execution).",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        if any(w in clean for w in ["take screenshot", "take a screenshot", "capture screen", "screenshot"]):
+            try:
+                from PIL import ImageGrab
+                from datetime import datetime
+                from pathlib import Path
+                screenshots_dir = Path("BR_WORKSPACE/Screenshots")
+                screenshots_dir.mkdir(parents=True, exist_ok=True)
+                filename = screenshots_dir / f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                img = ImageGrab.grab()
+                img.save(filename)
+                return {
+                    "executed": True,
+                    "intent": "screenshot",
+                    "target": str(filename),
+                    "result": f"Captured screenshot and saved to {filename.name} (0-Token Execution).",
+                    "tokens_saved": 2000,
+                }
+            except Exception as e:
+                pass
+
+        # 7. Match Folder Shortcuts (e.g., "open downloads", "open desktop", "open documents")
+        folder_match = re.search(r"^(?:open|launch|show)\s+(downloads|desktop|documents|pictures|workspace)\b", clean)
+        if folder_match:
+            folder_name = folder_match.group(1).lower()
+            user_home = Path.home()
+            folder_paths = {
+                "downloads": user_home / "Downloads",
+                "desktop": user_home / "Desktop",
+                "documents": user_home / "Documents",
+                "pictures": user_home / "Pictures",
+                "workspace": Path("workspace").resolve(),
+            }
+            target_path = folder_paths.get(folder_name)
+            if target_path and target_path.exists():
+                try:
+                    if sys.platform == "win32":
+                        os.startfile(str(target_path))
+                    elif sys.platform == "darwin":
+                        subprocess.Popen(["open", str(target_path)])
+                    else:
+                        subprocess.Popen(["xdg-open", str(target_path)])
+                    return {
+                        "executed": True,
+                        "intent": "folder_launch",
+                        "target": str(target_path),
+                        "result": f"Opened {folder_name.title()} folder (0-Token Execution).",
+                        "tokens_saved": 1800,
+                    }
+                except Exception:
+                    pass
+
+        # 8. Match Direct Web Search Intents (e.g. "search youtube for <query>", "search google for <query>", "search wikipedia for <query>")
+        search_youtube_match = re.search(r"^(?:search|find)\s+youtube\s+(?:for\s+)?(.+)$", clean)
+        if search_youtube_match:
+            query = search_youtube_match.group(1).strip()
+            import urllib.parse
+            encoded_q = urllib.parse.quote_plus(query)
+            url = f"https://www.youtube.com/results?search_query={encoded_q}"
+            try:
+                webbrowser.open(url)
+                return {
+                    "executed": True,
+                    "intent": "youtube_search",
+                    "target": url,
+                    "result": f"Searching YouTube for '{query}' (0-Token Execution).",
+                    "tokens_saved": 2200,
+                }
+            except Exception:
+                pass
+
+        search_google_match = re.search(r"^(?:search|find)\s+google\s+(?:for\s+)?(.+)$", clean)
+        if search_google_match:
+            query = search_google_match.group(1).strip()
+            import urllib.parse
+            encoded_q = urllib.parse.quote_plus(query)
+            url = f"https://www.google.com/search?q={encoded_q}"
+            try:
+                webbrowser.open(url)
+                return {
+                    "executed": True,
+                    "intent": "google_search",
+                    "target": url,
+                    "result": f"Searching Google for '{query}' (0-Token Execution).",
+                    "tokens_saved": 2200,
+                }
+            except Exception:
+                pass
+
+        search_wiki_match = re.search(r"^(?:search|find)\s+wikipedia\s+(?:for\s+)?(.+)$", clean)
+        if search_wiki_match:
+            query = search_wiki_match.group(1).strip()
+            import urllib.parse
+            encoded_q = urllib.parse.quote_plus(query)
+            url = f"https://en.wikipedia.org/wiki/Special:Search?search={encoded_q}"
+            try:
+                webbrowser.open(url)
+                return {
+                    "executed": True,
+                    "intent": "wikipedia_search",
+                    "target": url,
+                    "result": f"Searching Wikipedia for '{query}' (0-Token Execution).",
+                    "tokens_saved": 2200,
                 }
             except Exception:
                 pass

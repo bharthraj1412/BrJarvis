@@ -1,6 +1,6 @@
 /*
- * native/jarvis_native.c — JARVIS MK37 Native High-Performance Extension
- * Compiled into libjarvis_native.so / libjarvis_native.dll / libjarvis_native.dylib
+ * native/jarvis_native.c — JARVIS MK37 Native High-Performance C Extension
+ * Compiled into libjarvis_native.so / jarvis_native.dll / libjarvis_native.dylib
  */
 
 #include <stdio.h>
@@ -28,7 +28,7 @@ EXPORT uint64_t jarvis_fast_hash(const uint8_t* data, size_t len) {
     return hash;
 }
 
-/* 2. Fast SIMD-Style RMS Audio Energy Calculation for Voice Activity Detection */
+/* 2. Fast RMS Audio Energy Calculation for Voice Activity Detection */
 EXPORT float jarvis_audio_energy(const float* buffer, size_t samples) {
     if (!buffer || samples == 0) return 0.0f;
     double sum = 0.0;
@@ -56,7 +56,14 @@ EXPORT float jarvis_vector_dot_product(const float* vec1, const float* vec2, siz
     return (float)(dot / (sqrt(norm1) * sqrt(norm2)));
 }
 
-/* 4. High-Speed Grid Coordinate Transformation (0..1000 -> Screen Pixels) */
+/* 4. High-Speed Cosine Distance (1.0 - Cosine Similarity) */
+EXPORT float jarvis_fast_cosine_distance(const float* vec1, const float* vec2, size_t dim) {
+    float sim = jarvis_vector_dot_product(vec1, vec2, dim);
+    float dist = 1.0f - sim;
+    return dist < 0.0f ? 0.0f : dist;
+}
+
+/* 5. High-Speed Grid Coordinate Transformation (0..1000 -> Screen Pixels) */
 EXPORT void jarvis_grid_transform(int x_norm, int y_norm, int screen_w, int screen_h, int* out_x, int* out_y) {
     if (!out_x || !out_y) return;
     int px = (int)(((double)x_norm / 1000.0) * (double)screen_w);
@@ -71,7 +78,7 @@ EXPORT void jarvis_grid_transform(int x_norm, int y_norm, int screen_w, int scre
     *out_y = py;
 }
 
-/* 5. Low-Overhead Linux C System Memory Reader */
+/* 6. Low-Overhead Linux C System Memory Reader */
 EXPORT uint64_t jarvis_sys_memory_avail_kb(void) {
 #if defined(__linux__)
     FILE* fp = fopen("/proc/meminfo", "r");
@@ -91,7 +98,7 @@ EXPORT uint64_t jarvis_sys_memory_avail_kb(void) {
 #endif
 }
 
-/* 6. C Library Version Check */
+/* 7. C Library Version Check */
 EXPORT const char* jarvis_native_version(void) {
     return "37.5.0-native-accelerated";
 }

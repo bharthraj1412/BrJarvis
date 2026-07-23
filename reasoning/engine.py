@@ -36,16 +36,42 @@ class ReasoningEngine:
         """Decompose a high-level goal into a structured PlanGraph (DAG)."""
         logger.info(f"🧠 ReasoningEngine: Building PlanGraph for goal: '{goal}'")
         
-        # Determine risk tags and steps based on goal analysis
-        risk_level = "low"
+        graph = PlanGraph(goal=goal, parallelizable=True)
+
+        try:
+            from agent.planner import create_plan
+            plan_dict = create_plan(goal, context=context or "")
+            graph.parallelizable = plan_dict.get("can_parallelize", False)
+
+            for step in plan_dict.get("steps", []):
+                tool_name = step.get("tool", "web_search")
+                params = step.get("parameters", {})
+                desc = step.get("description", "")
+                conf = self.evaluate_confidence(tool_name, params, goal)
+
+                graph.nodes.append(
+                    TaskNode(
+                        id=step.get("step", len(graph.nodes) + 1),
+                        title=desc[:50] or tool_name,
+                        description=desc,
+                        tool=tool_name,
+                        args=params,
+                        depends_on=step.get("depends_on", []),
+                        confidence=conf,
+                    )
+                )
+            if graph.nodes:
+                return graph
+
+        except Exception as e:
+            logger.warning(f"Planner call failed in ReasoningEngine: {e} — falling back to heuristic graph")
+
+        # Fallback heuristic graph
         lower_goal = goal.lower()
+        risk_level = "low"
         if any(w in lower_goal for w in ("delete", "remove", "drop", "terminate", "format")):
             risk_level = "high"
 
-        # Construct initial plan graph
-        graph = PlanGraph(goal=goal, parallelizable=True)
-
-        # Example rule-based decomposition / LLM planning fallback
         if "search" in lower_goal or "find" in lower_goal:
             graph.nodes.append(
                 TaskNode(
@@ -80,12 +106,12 @@ class ReasoningEngine:
             graph.nodes.append(
                 TaskNode(
                     id=1,
-                    title="Analyze request",
+                    title="Execute Task",
                     description=f"Inspect system state and execute task for '{goal}'",
-                    tool="system_monitor",
-                    args={},
+                    tool="code_helper",
+                    args={"description": goal},
                     confidence=ConfidenceScore(
-                        overall=0.95,
+                        overall=0.9,
                         reasoning_quality=0.9,
                         tool_match_score=0.9,
                         risk_level=risk_level,
@@ -96,7 +122,7 @@ class ReasoningEngine:
         return graph
 
     def evaluate_confidence(self, tool_name: str, args: Dict[str, Any], goal: str) -> ConfidenceScore:
-        """Assess risk level and confidence score for a proposed tool action."""
+        """Assess risk level and confidence score for a proposed tool action, checking past lessons."""
         risk = "low"
         
         # High-risk actions
@@ -109,8 +135,21 @@ class ReasoningEngine:
         if any(word in arg_str for word in ("rm -rf", "del /f", "format", "drop table", "shutdown")):
             risk = "critical"
 
+        overall_score = 0.85 if risk != "critical" else 0.3
+
+        # Query LessonStore for past corrections on this tool
+        try:
+            from memory.lessons import LessonStore
+            ls = LessonStore()
+            past_lessons = ls.get_relevant_lessons(query=tool_name, limit=2)
+            if past_lessons:
+                # Lower confidence score slightly if past corrections exist for this tool
+                overall_score = max(0.4, overall_score - 0.15)
+        except Exception:
+            pass
+
         return ConfidenceScore(
-            overall=0.85 if risk != "critical" else 0.3,
+            overall=overall_score,
             reasoning_quality=0.9,
             tool_match_score=0.9,
             risk_level=risk,
@@ -125,7 +164,6 @@ class ReasoningEngine:
             trace.verification_notes = "Empty steps in trace"
             return False
 
-        # Check if any step failed critically
         failed_steps = [s for s in trace.steps if s.observation and "error" in s.observation.lower()]
         if failed_steps:
             trace.verified = False

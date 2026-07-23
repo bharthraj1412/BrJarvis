@@ -1,8 +1,4 @@
 # guardian/core.py — Master Guardian Core Safety Engine
-"""
-Master Guardian Core Safety Engine.
-Boots first, verifies integrity hashes, holds permissions, and coordinates pause/rollback states.
-"""
 from __future__ import annotations
 
 import hashlib
@@ -12,6 +8,8 @@ from guardian.kill_switch import KillSwitch
 from guardian.snapshot import SnapshotManager
 from guardian.rollback import RollbackEngine
 from guardian.audit_log import AuditLog
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 PROTECTED_CORE_PATHS = [
     "guardian/core.py",
@@ -26,15 +24,39 @@ PROTECTED_CORE_PATHS = [
 class GuardianCore:
     """Master Immutable Safety Core."""
 
+    _HASH_FILE = BASE_DIR / ".guardian_hashes.json"
+
     def __init__(self, integrity_interval: int = 300):
         self.integrity_interval = integrity_interval
-        self._initial_hashes = self._calculate_hashes()
+        self._initial_hashes = self._load_or_compute_hashes()
         self._last_check = time.time()
+
+    def _load_or_compute_hashes(self) -> dict[str, str]:
+        """Load hashes from disk if available, otherwise compute and persist."""
+        import json
+        if self._HASH_FILE.exists():
+            try:
+                return json.loads(self._HASH_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        hashes = self._calculate_hashes()
+        self._persist_hashes(hashes)
+        return hashes
+
+    def _persist_hashes(self, hashes: dict[str, str]) -> None:
+        """Write hashes to disk for persistence across restarts."""
+        import json
+        try:
+            self._HASH_FILE.write_text(
+                json.dumps(hashes, indent=2), encoding="utf-8"
+            )
+        except Exception:
+            pass
 
     def _calculate_hashes(self) -> dict[str, str]:
         hashes = {}
         for path_str in PROTECTED_CORE_PATHS:
-            p = Path(path_str)
+            p = BASE_DIR / path_str
             if p.exists():
                 try:
                     data = p.read_bytes()
@@ -42,6 +64,19 @@ class GuardianCore:
                 except Exception:
                     pass
         return hashes
+
+    def rehash_integrity(self) -> None:
+        """Update baseline hashes after a verified, authorized system upgrade."""
+        self._initial_hashes = self._calculate_hashes()
+        self._persist_hashes(self._initial_hashes)
+        self._last_check = time.time()
+        AuditLog.log(
+            event_type="GUARDIAN_REHASH",
+            title="Integrity Hashes Updated",
+            details={"files_count": len(self._initial_hashes)},
+            risk_level="LOW",
+            applied=True,
+        )
 
     def verify_integrity(self) -> dict:
         """Verify core safety files have not been modified outside release process."""
@@ -80,3 +115,13 @@ class GuardianCore:
                 return False
 
         return True
+
+
+_global_guardian_core = None
+
+
+def get_guardian_core() -> GuardianCore:
+    global _global_guardian_core
+    if _global_guardian_core is None:
+        _global_guardian_core = GuardianCore()
+    return _global_guardian_core

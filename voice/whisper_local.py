@@ -10,8 +10,8 @@ import io
 import os
 import tempfile
 import traceback
+import threading
 from pathlib import Path
-
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -21,16 +21,18 @@ WHISPER_MODEL = os.environ.get("JARVIS_WHISPER_MODEL", "base")
 
 _whisper_engine = None
 _engine_type = None  # "faster" or "openai"
+_engine_lock = threading.Lock()
 
 
 def _get_engine():
     """Lazy-load the Whisper engine. Tries faster-whisper first, then openai-whisper."""
     global _whisper_engine, _engine_type
 
-    if _whisper_engine is not None:
-        return _whisper_engine, _engine_type
+    with _engine_lock:
+        if _whisper_engine is not None:
+            return _whisper_engine, _engine_type
 
-    model_name = WHISPER_MODEL
+        model_name = WHISPER_MODEL
 
     # Try faster-whisper first (much faster with CTranslate2)
     try:
@@ -259,7 +261,8 @@ def transcribe_file(file_path: str, language: str = "auto", output_format: str =
 def _extract_audio(video_path: str) -> str | None:
     """Extract audio from video file using ffmpeg."""
     import subprocess
-    output_path = tempfile.mktemp(suffix=".wav")
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        output_path = tmp.name
     try:
         subprocess.run(
             ["ffmpeg", "-i", video_path, "-vn", "-acodec", "pcm_s16le",

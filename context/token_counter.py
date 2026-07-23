@@ -1,6 +1,7 @@
 # context/token_counter.py — Token Count Estimator & Accounting Engine for JARVIS MK37
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Union
 
@@ -19,11 +20,28 @@ class TokenCounter:
     """Estimates and counts token consumption with tiktoken or fast char-ratio fallback."""
 
     @staticmethod
-    def count(text: Union[str, Any]) -> int:
-        """Calculate token length for a string or object representation."""
+    def count(text: Union[str, list, dict, Any]) -> int:
+        """Calculate token length for a string, message list, or dict representation."""
         if not text:
             return 0
-        if not isinstance(text, str):
+        
+        if isinstance(text, list):
+            # Message list: sum content of turns
+            total = 0
+            for item in text:
+                if isinstance(item, dict):
+                    c = item.get("content", "")
+                    total += TokenCounter.count(c) + 4  # ~4 overhead tokens per turn
+                else:
+                    total += TokenCounter.count(str(item))
+            return max(1, total)
+
+        if isinstance(text, dict):
+            try:
+                text = json.dumps(text, default=str)
+            except Exception:
+                text = str(text)
+        elif not isinstance(text, str):
             text = str(text)
 
         if _TIKTOKEN_AVAILABLE and _encoder:

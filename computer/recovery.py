@@ -76,7 +76,7 @@ class SelfHealingEngine:
         )
 
     def _dismiss_unexpected_popups(self, report) -> bool:
-        """Inspect screen for popups or modal dialogs and dismiss them if possible."""
+        """Inspect screen for popups or modal dialogs and dismiss them via click or Escape key."""
         graph = report.semantic_graph
         if not graph:
             return False
@@ -93,6 +93,14 @@ class SelfHealingEngine:
                 from computer.types import ActionType, ComputerAction
                 get_computer_operator().execute_action(
                     ComputerAction(action_type=ActionType.MOUSE_CLICK, x=btn.bbox.center_x, y=btn.bbox.center_y)
+                )
+                return True
+            else:
+                # Fallback: send Escape key press to dismiss modal dialog
+                from computer.operator import get_computer_operator
+                from computer.types import ActionType, ComputerAction
+                get_computer_operator().execute_action(
+                    ComputerAction(action_type=ActionType.KEYBOARD_PRESS, keys=["escape"])
                 )
                 return True
 

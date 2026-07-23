@@ -1,15 +1,18 @@
-# agent/task_queue.py — JARVIS MK37 Parallel Task Queue
+# agent/task_queue.py — Multi-Threaded Task Queue for JARVIS MK37
 """
 High-performance task queue with parallel execution support.
 - Concurrent goal execution (multiple tasks at once)
 - Priority-based scheduling
-- Real-time status tracking
-- Cancellation support
+- Task retention & history management
+- Real-time status tracking & cancellation support
+- Pause & Resume controls
 """
 from __future__ import annotations
 
+import os
 import threading
 import time
+import traceback
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -22,6 +25,7 @@ class TaskStatus(Enum):
     COMPLETED = "completed"
     FAILED    = "failed"
     CANCELLED = "cancelled"
+    PAUSED    = "paused"
 
 
 class TaskPriority(Enum):
@@ -49,31 +53,29 @@ class Task:
 class TaskQueue:
     """
     Multi-threaded task queue with parallel execution.
-    Tasks can run simultaneously (configurable concurrency).
+    Tasks can run simultaneously with auto-tuned worker concurrency.
     """
 
-    def __init__(self, max_concurrent: int = 3):
+    def __init__(self, max_concurrent: int | None = None, max_history: int = 100):
+        cpus = os.cpu_count() or 4
+        self._max = max_concurrent or min(max(3, cpus), 8)
+        self._max_history = max_history
+
         self._queue:    list[Task]       = []
         self._lock:     threading.Lock   = threading.Lock()
         self._cond:     threading.Condition = threading.Condition(self._lock)
         self._tasks:    dict[str, Task]  = {}
         self._running:  bool             = False
+        self._paused:   bool             = False
         self._workers:  list[threading.Thread] = []
         self._active:   int              = 0
-        self._max       = max_concurrent
         self._executor  = None
-
-    def _get_executor(self):
-        if self._executor is None:
-            from agent.executor import AgentExecutor
-            self._executor = AgentExecutor()
-        return self._executor
 
     def start(self) -> None:
         if self._running:
             return
         self._running = True
-        # Start multiple worker threads for concurrency
+        self._paused = False
         for i in range(self._max):
             t = threading.Thread(
                 target=self._worker_loop,
@@ -82,12 +84,24 @@ class TaskQueue:
             )
             t.start()
             self._workers.append(t)
-        print(f"[TaskQueue] ✅ Started with {self._max} workers")
+        print(f"[TaskQueue] ✅ Started with {self._max} auto-tuned workers")
 
     def stop(self) -> None:
         self._running = False
         with self._cond:
             self._cond.notify_all()
+
+    def pause(self) -> None:
+        """Pause worker processing."""
+        self._paused = True
+        print("[TaskQueue] ⏸️ Task queue paused")
+
+    def resume(self) -> None:
+        """Resume worker processing."""
+        self._paused = False
+        with self._cond:
+            self._cond.notify_all()
+        print("[TaskQueue] ▶️ Task queue resumed")
 
     def submit(
         self,
@@ -111,6 +125,7 @@ class TaskQueue:
             self._queue.append(task)
             self._queue.sort(key=lambda t: (t.priority, t.created_at))
             self._tasks[task_id] = task
+            self._prune_history()
             self._cond.notify()
 
         print(f"[TaskQueue] 📥 Queued [{task_id}]: {goal[:60]}")
@@ -122,7 +137,7 @@ class TaskQueue:
         priority:    TaskPriority = TaskPriority.NORMAL,
         speak:       Callable | None = None,
     ) -> list[str]:
-        """Submit multiple goals simultaneously. All run in parallel if capacity allows."""
+        """Submit multiple goals simultaneously."""
         return [self.submit(goal, priority, speak) for goal in goals]
 
     def cancel(self, task_id: str) -> bool:
@@ -166,6 +181,20 @@ class TaskQueue:
                 })
             return statuses
 
+    def _prune_history(self) -> None:
+        """Keep memory usage bounded by retaining at most _max_history completed/failed tasks."""
+        if len(self._tasks) <= self._max_history:
+            return
+        
+        finished_ids = [
+            tid for tid, t in self._tasks.items() 
+            if t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
+        ]
+        
+        overflow = len(self._tasks) - self._max_history
+        for tid in finished_ids[:overflow]:
+            self._tasks.pop(tid, None)
+
     def pending_count(self) -> int:
         with self._lock:
             return sum(1 for t in self._queue if t.status == TaskStatus.PENDING)
@@ -175,13 +204,13 @@ class TaskQueue:
             return self._active
 
     def wait_for(self, task_id: str, timeout: float = 300) -> dict | None:
-        """Block until a specific task completes. Returns its status dict."""
+        """Block until a specific task completes."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             status = self.get_status(task_id)
             if status and status["status"] in ("completed", "failed", "cancelled"):
                 return status
-            time.sleep(0.5)
+            time.sleep(0.3)
         return self.get_status(task_id)
 
     def _worker_loop(self) -> None:
@@ -189,9 +218,9 @@ class TaskQueue:
         while self._running:
             task = None
             with self._cond:
-                while self._running and not self._can_pick():
-                    self._cond.wait(timeout=1.0)
-                if self._running:
+                while self._running and (self._paused or not self._can_pick()):
+                    self._cond.wait(timeout=0.5)
+                if self._running and not self._paused:
                     task = self._next_task()
                     if task:
                         task.status   = TaskStatus.RUNNING
@@ -260,11 +289,9 @@ class TaskQueue:
             self._cond.notify_all()
 
 
-import traceback
-
 # ── Global singleton ───────────────────────────────────────────────────────
 
-_queue         = TaskQueue(max_concurrent=3)
+_queue         = TaskQueue()
 _started       = False
 _start_lock    = threading.Lock()
 

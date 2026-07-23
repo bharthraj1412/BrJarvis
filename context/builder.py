@@ -49,6 +49,26 @@ class ContextBuilder:
             logger.warning(f"Failed to load lessons context: {e}")
         return self
 
+    def add_memories(self, query: str, priority: int = 7, limit: int = 5) -> ContextBuilder:
+        """Retrieve and add relevant long-term memories at Priority 7."""
+        try:
+            from memory.unified_memory import get_unified_memory
+            um = get_unified_memory()
+            memories = um.recall(query=query, limit=limit)
+            if memories:
+                lines = [f"- [{m.get('name', 'Memory')}]: {m.get('content', '')}" for m in memories]
+                content = "Relevant Long-Term Memories:\n" + "\n".join(lines)
+                item = ContextItem(
+                    scope=ContextScope.MEMORY,
+                    title="Relevant Persistent Memories",
+                    content=content,
+                    priority=priority,
+                )
+                self.add_item(item)
+        except Exception as e:
+            logger.warning(f"Failed to load memory context: {e}")
+        return self
+
     def assemble(self) -> AssembledContext:
         """Assemble items sorted by priority within available token budget."""
         available_budget = self.budget.available_context_tokens

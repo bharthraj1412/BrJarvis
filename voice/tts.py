@@ -1,7 +1,9 @@
-# voice/tts.py — JARVIS MK37 Neural Text-To-Speech Engine
+# voice/tts.py — JARVIS MK37 Neural Text-To-Speech Engine (v2 — Sentence Streaming)
 """
 High-quality text-to-speech using Microsoft Edge neural voices.
-Fallback support to Linux native audio utilities, pyttsx3/espeak, or Windows SAPI5.
+v2: Sentence-level streaming for <300ms time-to-first-audio.
+    Instant barge-in cancel on new task.
+    Smart text cleaning for AI assistant output.
 """
 from __future__ import annotations
 
@@ -33,6 +35,49 @@ try:
     _HAS_PYTHONCOM = True
 except ImportError:
     pass
+
+
+# ── Smart text cleaner for AI assistant output ────────────────────────────
+_TOOL_CALL_RX = re.compile(r'```tool_call\s*\n\s*\{.*?\}\s*\n\s*```', re.DOTALL)
+_XML_TOKEN_RX = re.compile(r'<\|.*?\|>', re.DOTALL)
+_CHANNEL_RX   = re.compile(r'<\|channel\|>.*?<\|call\|>', re.DOTALL)
+_MESSAGE_RX   = re.compile(r'<\|message\|>.*?<\|call\|>', re.DOTALL)
+_START_RX      = re.compile(r'<\|start\|>.*?<\|call\|>', re.DOTALL)
+_JSON_BLOCK_RX = re.compile(r'\{["\']tool["\']\s*:\s*["\'][^"\']+["\']\s*,\s*["\']args["\']\s*:\s*\{.*?\}\s*\}', re.DOTALL)
+_MD_CHARS_RX   = re.compile(r'[*_~`#\[\](){}<>|]')
+_LINK_RX       = re.compile(r'\[([^\]]*)\]\([^)]*\)')
+_URL_RX        = re.compile(r'https?://\S+')
+_FILE_PATH_RX  = re.compile(r'(?:[A-Z]:\\|/)[^\s,;]+')
+_EMOJI_RX      = re.compile(r'[\U0001F300-\U0001FAFF\U00002702-\U000027B0]')
+_WHITESPACE_RX = re.compile(r'\s{2,}')
+
+def clean_for_speech(text: str) -> str:
+    """Remove tool calls, markdown, URLs, file paths, JSON blocks, and emojis from text for clean speech output."""
+    t = _TOOL_CALL_RX.sub('', text)
+    t = _START_RX.sub('', t)
+    t = _CHANNEL_RX.sub('', t)
+    t = _MESSAGE_RX.sub('', t)
+    t = _XML_TOKEN_RX.sub('', t)
+    t = _JSON_BLOCK_RX.sub('', t)
+    t = _LINK_RX.sub(r'\1', t)       # [link text](url) → link text
+    t = _URL_RX.sub('', t)
+    t = _FILE_PATH_RX.sub('', t)
+    t = _EMOJI_RX.sub('', t)
+    t = _MD_CHARS_RX.sub('', t)
+    t = _WHITESPACE_RX.sub(' ', t)
+    return t.strip()
+
+
+# ── Sentence splitter for streaming TTS ───────────────────────────────────
+_SENTENCE_RX = re.compile(r'([^.!?\n]+[.!?\n]+)')
+
+def split_sentences(text: str) -> list[str]:
+    """Split text into speakable sentence chunks."""
+    sentences = _SENTENCE_RX.findall(text)
+    remainder = _SENTENCE_RX.sub('', text).strip()
+    if remainder:
+        sentences.append(remainder)
+    return [s.strip() for s in sentences if s.strip() and len(s.strip()) > 1]
 
 
 class MCIPlayer:
@@ -131,7 +176,7 @@ class MCIPlayer:
         """Play a file and block until playback completes."""
         alias = cls.play_file(filepath)
         while cls.is_playing(alias):
-            time.sleep(0.05)
+            time.sleep(0.02)
         cls.stop(alias)
 
     @classmethod
@@ -152,10 +197,35 @@ class MCIPlayer:
                     except Exception:
                         pass
 
+    @classmethod
+    def stop_all(cls):
+        """Stop ALL active playback aliases."""
+        if _OS == "Windows":
+            try:
+                cls._send('close all')
+            except RuntimeError:
+                pass
+        else:
+            with cls._lock:
+                for alias, proc in list(cls._active_processes.items()):
+                    if proc and proc.poll() is None:
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+                cls._active_processes.clear()
+
 
 class NeuralTTS:
     """High-quality text-to-speech using Microsoft Edge neural voices.
     Falls back to Linux espeak/spd-say or Windows SAPI5.
+    
+    v2 improvements:
+    - Sentence-level streaming: splits text into sentences and synthesizes/plays
+      each sentence independently for <300ms time-to-first-audio.
+    - Instant barge-in: stop() cancels synthesis and playback immediately.
+    - Task isolation: new speak_async() call auto-cancels any previous speech.
+    - Smart text cleaner: strips tool calls, markdown, URLs, file paths, emojis.
     """
 
     VOICES = {
@@ -173,7 +243,25 @@ class NeuralTTS:
         self._temp_dir.mkdir(exist_ok=True)
         self._current_alias = None
         self._is_speaking = False
-        self._speak_lock = threading.Lock()
+        self._cancel_event = threading.Event()   # instant cancel signal
+        self._generation_id = 0                  # monotonic generation counter for task isolation
+        self._gen_lock = threading.Lock()         # thread lock for generation ID
+        self._prune_cache()
+
+    def _prune_cache(self, max_files: int = 500, max_bytes: int = 200 * 1024 * 1024):
+        """Prune TTS cache directory if it exceeds max files or total byte limit."""
+        try:
+            files = sorted(self._temp_dir.glob("tts_*.mp3"), key=lambda p: p.stat().st_mtime)
+            total_size = sum(p.stat().st_size for p in files)
+            while files and (len(files) > max_files or total_size > max_bytes):
+                oldest = files.pop(0)
+                try:
+                    total_size -= oldest.stat().st_size
+                    oldest.unlink(missing_ok=True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         # Fallback speaker
         self._sapi_speaker = None
@@ -212,11 +300,15 @@ class NeuralTTS:
         return self._is_speaking
 
     def stop(self):
-        """Instantly stop any active speech playback (Barge-In interruption)."""
+        """Instantly stop any active speech playback (Barge-In interruption).
+        Cancels both synthesis and playback immediately.
+        """
+        self._cancel_event.set()
         self._is_speaking = False
         if self._current_alias:
             MCIPlayer.stop(self._current_alias)
             self._current_alias = None
+        MCIPlayer.stop_all()
         if self._sapi_speaker:
             try:
                 self._sapi_speaker.Speak("", 2)  # SAPI purge flag
@@ -224,86 +316,97 @@ class NeuralTTS:
                 pass
 
     def speak_async(self, text: str, on_start=None, on_finish=None):
-        """Speak text in a background thread."""
+        """Speak text in a background thread with sentence-level streaming.
+        
+        Auto-cancels any previous speech before starting (task isolation).
+        """
+        # Cancel any in-progress speech immediately
+        if self._is_speaking:
+            self.stop()
+
+        self._cancel_event.clear()
+        with self._gen_lock:
+            self._generation_id += 1
+            gen_id = self._generation_id
+
         thread = threading.Thread(
-            target=self._speak_worker,
-            args=(text, on_start, on_finish),
+            target=self._speak_streaming_worker,
+            args=(text, on_start, on_finish, gen_id),
             daemon=True
         )
         thread.start()
 
-    def _speak_worker(self, text: str, on_start=None, on_finish=None):
-        """Worker that generates + plays TTS audio."""
-        with self._speak_lock:
-            self._is_speaking = True
-            if on_start:
-                on_start()
+    def _speak_streaming_worker(self, text: str, on_start, on_finish, gen_id: int):
+        """Worker that cleans text, splits into sentences, and synthesizes/plays each independently."""
+        self._is_speaking = True
+        if on_start:
+            on_start()
 
-            # Clean text of all tool calls and XML/agent control tokens
-            import re
-            clean_text = re.sub(r'```tool_call\s*\n\s*\{.*?\}\s*\n\s*```', '', text, flags=re.DOTALL)
-            clean_text = re.sub(r'<\|start\|>.*?<\|call\|>', '', clean_text, flags=re.DOTALL)
-            clean_text = re.sub(r'<\|channel\|>.*?<\|call\|>', '', clean_text, flags=re.DOTALL)
-            clean_text = re.sub(r'<\|message\|>.*?<\|call\|>', '', clean_text, flags=re.DOTALL)
-            clean_text = re.sub(r'<\|.*?\|>', '', clean_text)
-            
-            # Clean remaining formatting marks
-            clean_text = re.sub(r'[*_~`#\[\](){}|<>]', '', clean_text).strip()
-
+        try:
+            clean_text = clean_for_speech(text)
             if not clean_text:
-                self._is_speaking = False
-                if on_finish:
-                    on_finish()
                 return
 
-            try:
-                success = False
-                if _HAS_EDGE_TTS:
-                    try:
-                        self._speak_edge_tts(clean_text)
-                        success = True
-                    except Exception as edge_err:
-                        print(f"[JARVIS] Edge-TTS offline or failed ({edge_err}). Falling back to SAPI5/native...")
-                
-                if not success:
-                    if _OS == "Windows" and self._sapi_speaker:
-                        self._speak_sapi5(clean_text)
-                    else:
-                        self._speak_linux_fallback(clean_text)
-            except Exception as e:
-                print(f"[JARVIS] TTS final error: {e}")
-                traceback.print_exc()
-            finally:
-                self._is_speaking = False
-                self._current_alias = None
-                if on_finish:
-                    on_finish()
+            sentences = split_sentences(clean_text)
+            if not sentences:
+                sentences = [clean_text]
 
-    def _speak_edge_tts(self, text: str):
-        """Generate speech using edge-tts and play via cross-platform audio player."""
-        clean_text = re.sub(r'[*_~`#\[\](){}|<>]', '', text)
-        clean_text = clean_text.strip()
-        if not clean_text:
+            for sentence in sentences:
+                # Check cancel signal before each sentence
+                if self._cancel_event.is_set() or gen_id != self._generation_id:
+                    break
+
+                self._speak_single_sentence(sentence)
+
+        except Exception as e:
+            print(f"[JARVIS] TTS streaming error: {e}")
+            traceback.print_exc()
+        finally:
+            self._is_speaking = False
+            self._current_alias = None
+            if on_finish and gen_id == self._generation_id:
+                on_finish()
+
+    def _speak_single_sentence(self, sentence: str):
+        """Synthesize and play a single sentence. Checks cancel between synthesis and playback."""
+        if self._cancel_event.is_set():
             return
 
-        cache_key = uuid.uuid5(uuid.NAMESPACE_URL, f"{self.voice}|{self.rate}|{self.pitch}|{clean_text}").hex
-        mp3_path = self._temp_dir / f"tts_{cache_key}.mp3"
-        if mp3_path.exists() and mp3_path.stat().st_size >= 100:
+        success = False
+        if _HAS_EDGE_TTS:
             try:
-                alias = MCIPlayer.play_file(str(mp3_path))
-                self._current_alias = alias
-                while MCIPlayer.is_playing(alias):
-                    time.sleep(0.03)
-                MCIPlayer.stop(alias)
-                return
-            except Exception:
-                pass
+                self._synth_and_play_edge(sentence)
+                success = True
+            except Exception as e:
+                print(f"[JARVIS] Edge-TTS sentence failed ({e}). Falling back...")
+        
+        if not success:
+            if _OS == "Windows" and self._sapi_speaker:
+                self._speak_sapi5(sentence)
+            else:
+                self._speak_linux_fallback(sentence)
 
-        # Generate MP3 file
+    def _synth_and_play_edge(self, sentence: str):
+        """Synthesize one sentence with edge-tts, cache it, and play."""
+        if self._cancel_event.is_set():
+            return
+
+        cache_key = uuid.uuid5(uuid.NAMESPACE_URL, f"{self.voice}|{self.rate}|{self.pitch}|{sentence}").hex
+        mp3_path = self._temp_dir / f"tts_{cache_key}.mp3"
+
+        # Check cache first (instant playback for repeated phrases)
+        if mp3_path.exists() and mp3_path.stat().st_size >= 100:
+            self._play_and_wait(str(mp3_path))
+            return
+
+        # Synthesize
+        if self._cancel_event.is_set():
+            return
+
         loop = asyncio.new_event_loop()
         try:
             communicate = edge_tts.Communicate(
-                text=clean_text,
+                text=sentence,
                 voice=self.voice,
                 rate=self.rate,
                 pitch=self.pitch,
@@ -312,22 +415,35 @@ class NeuralTTS:
         finally:
             loop.close()
 
+        if self._cancel_event.is_set():
+            return
+
         if not mp3_path.exists() or mp3_path.stat().st_size < 100:
-            print("[JARVIS] edge-tts generated empty audio, skipping playback.")
+            return
+
+        self._prune_cache()
+        self._play_and_wait(str(mp3_path))
+
+    def _play_and_wait(self, filepath: str):
+        """Play an audio file and wait for completion, checking cancel every 20ms."""
+        if self._cancel_event.is_set():
             return
 
         try:
-            alias = MCIPlayer.play_file(str(mp3_path))
+            alias = MCIPlayer.play_file(filepath)
             self._current_alias = alias
             while MCIPlayer.is_playing(alias):
-                time.sleep(0.03)
+                if self._cancel_event.is_set():
+                    MCIPlayer.stop(alias)
+                    return
+                time.sleep(0.02)
             MCIPlayer.stop(alias)
-        finally:
+        except Exception:
             pass
 
     def _speak_sapi5(self, text: str):
         """Speak using SAPI5 (Windows blocking)."""
-        if not self._sapi_speaker:
+        if not self._sapi_speaker or self._cancel_event.is_set():
             return
         try:
             if _HAS_PYTHONCOM:
@@ -338,7 +454,9 @@ class NeuralTTS:
 
     def _speak_linux_fallback(self, text: str):
         """Speak using Linux spd-say or espeak fallback."""
-        clean = re.sub(r'[*_~`#\[\](){}|<>]', '', text).strip()
+        if self._cancel_event.is_set():
+            return
+        clean = re.sub(r'[*_~`#\[\](){}<>|]', '', text).strip()
         if not clean:
             return
         
@@ -348,12 +466,51 @@ class NeuralTTS:
             subprocess.run(["espeak-ng", clean], capture_output=True)
         elif shutil.which("espeak"):
             subprocess.run(["espeak", clean], capture_output=True)
-        else:
-            print(f"[JARVIS] (Console TTS Fallback): {text}")
 
-    def stop(self):
-        """Stop any current speech playback."""
-        if self._current_alias:
-            MCIPlayer.stop(self._current_alias)
-            self._current_alias = None
-        self._is_speaking = False
+    def speak_stream(self, token_generator, on_start=None, on_finish=None):
+        """Stream LLM tokens, split into sentences, and synthesize/play audio
+        on sentence boundaries for <300ms time-to-first-audio latency."""
+        # Cancel any prior speech
+        if self._is_speaking:
+            self.stop()
+
+        self._cancel_event.clear()
+        with self._gen_lock:
+            self._generation_id += 1
+            gen_id = self._generation_id
+
+        def _stream_worker():
+            self._is_speaking = True
+            if on_start:
+                on_start()
+            
+            buffer = ""
+
+            try:
+                for token in token_generator:
+                    if self._cancel_event.is_set() or gen_id != self._generation_id:
+                        break
+                    buffer += token
+                    
+                    matches = _SENTENCE_RX.findall(buffer)
+                    if matches:
+                        for sentence in matches:
+                            if self._cancel_event.is_set() or gen_id != self._generation_id:
+                                break
+                            clean_s = clean_for_speech(sentence)
+                            if clean_s and len(clean_s) > 1:
+                                self._speak_single_sentence(clean_s)
+                            buffer = buffer[len(sentence):]
+
+                if buffer.strip() and not self._cancel_event.is_set() and gen_id == self._generation_id:
+                    clean_s = clean_for_speech(buffer)
+                    if clean_s:
+                        self._speak_single_sentence(clean_s)
+            except Exception as e:
+                print(f"[NeuralTTS] Stream TTS error: {e}")
+            finally:
+                self._is_speaking = False
+                if on_finish and gen_id == self._generation_id:
+                    on_finish()
+
+        threading.Thread(target=_stream_worker, daemon=True).start()

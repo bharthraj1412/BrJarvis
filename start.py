@@ -272,7 +272,7 @@ def _install_playwright_browsers():
 
 def doctor(auto_confirm: bool = False):
     _banner()
-    console.print("[bold magenta]JARVIS MK37 System Doctor & Auto-Repair Engine[/]\n")
+    console.print("[bold magenta]⚡ JARVIS MK37 Advanced System Doctor & Self-Healing Repair Engine ⚡[/]\n")
 
     # 1. Python Libraries Audit
     python_dependencies: dict[str, str] = {
@@ -294,17 +294,20 @@ def doctor(auto_confirm: bool = False):
         "opencv-python": "cv2",
         "requests": "requests",
         "httpx": "httpx",
-        "ddgs": "ddgs",
+        "duckduckgo-search": "ddgs",
         "beautifulsoup4": "bs4",
         "playwright": "playwright",
         "youtube-transcript-api": "youtube_transcript_api",
         "chromadb": "chromadb",
         "anthropic": "anthropic",
+        "python-docx": "docx",
+        "fpdf2": "fpdf",
+        "openpyxl": "openpyxl",
     }
     
     missing_pip: list[tuple[str, str]] = []
     
-    table_pip = Table(title="1. Python Packages Audit", box=None)
+    table_pip = Table(title="1. Core Python Packages Audit", box=None)
     table_pip.add_column("Package Name", style="bold cyan")
     table_pip.add_column("Import Identifier", style="dim")
     table_pip.add_column("Status")
@@ -413,7 +416,53 @@ def doctor(auto_confirm: bool = False):
 
     console.print()
 
-    # 5. Fix & Auto-Repair Phase
+    # 5. AI Backends & Gateway Health Audit
+    table_ai = Table(title="5. AI Backends & Model Gateway Audit", box=None)
+    table_ai.add_column("Provider / Model Profile", style="bold magenta")
+    table_ai.add_column("Model Name", style="dim")
+    table_ai.add_column("Status")
+
+    try:
+        from router import load_available_backends
+        active_backends = load_available_backends()
+        for prof, b_inst in active_backends.items():
+            try:
+                ok = b_inst.ping(timeout=6.0)
+                if ok:
+                    table_ai.add_row(b_inst.name, b_inst.model_name, "[green]✓ ONLINE[/]")
+                else:
+                    table_ai.add_row(b_inst.name, b_inst.model_name, "[yellow]⚠ OFFLINE (Ping Timeout)[/]")
+            except Exception:
+                table_ai.add_row(b_inst.name, getattr(b_inst, 'model_name', 'N/A'), "[yellow]⚠ Key Unconfigured[/]")
+    except Exception as e:
+        table_ai.add_row("Router Core", "AgentRouter", f"[yellow]⚠ Warning: {e}[/]")
+
+    console.print(table_ai)
+    console.print()
+
+    # 6. Database & Persistent Memory Health Audit
+    console.print("[bold cyan]6. Database & Vector Memory Layer Audit[/]")
+    try:
+        from memory.persistent_store import get_memory_dir
+        mem_d = get_memory_dir("user")
+        sqlite_db = mem_d / "memory.db"
+        if sqlite_db.exists():
+            console.print(f"  [green]✓ Persistent SQLite DB Active:[/] {sqlite_db}")
+        else:
+            console.print(f"  [green]✓ SQLite Store Ready:[/] auto-initializes on startup")
+    except Exception as me:
+        console.print(f"  [yellow]⚠ Persistent Memory note: {me}[/]")
+
+    try:
+        from memory.vector_store import VectorMemory
+        vm = VectorMemory()
+        console.print("  [green]✓ Vector Memory Layer Active (ChromaDB / TF-IDF)[/]")
+    except Exception as ve:
+        console.print(f"  [yellow]⚠ Vector Store note: {ve}[/]")
+
+    console.print()
+
+    # 7. Fix & Auto-Repair Phase
     if not missing_pip:
         console.print("[bold green]========================================================[/]")
         console.print("[bold green]  DOCTOR DIAGNOSIS: SYSTEM IS 100% HEALTHY & OPERATIONAL!  [/]")
@@ -658,12 +707,14 @@ def show_audio_status():
         console.print("\n[bold cyan]🎙️ Live Microphone Signal Calibration Check:[/]")
         try:
             import numpy as np
-            rec_data = sd.rec(int(0.5 * 16000), samplerate=16000, channels=1, dtype='float32')
+            from voice.stt import SounddeviceMicrophone
+            mic_dev = SounddeviceMicrophone().device_index
+            rec_data = sd.rec(int(0.5 * 16000), samplerate=16000, channels=1, device=mic_dev, dtype='float32')
             sd.wait()
             rms_val = float(np.sqrt(np.mean(rec_data**2)))
             bars = int(min(20, max(0, rms_val * 100)))
             meter_bar = "█" * bars + "░" * (20 - bars)
-            console.print(f"  Live Mic Energy Level: [[cyan]{meter_bar}[/]] ({rms_val:.4f})")
+            console.print(f"  Live Mic Energy Level (Device {mic_dev}): [[cyan]{meter_bar}[/]] ({rms_val:.4f})")
             console.print("  [green]✓ Hardware Microphone Stream Operational[/]")
         except Exception as mic_err:
             console.print(f"  [yellow]⚠ Live mic test note: {mic_err}[/]")

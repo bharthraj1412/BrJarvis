@@ -147,15 +147,25 @@ def _has_rich():
 
 
 def _print_ok(msg: str):
-    if _has_rich():
-        from rich.console import Console
-        Console().print(f"  [green]✓[/] {msg}")
-    else:
-        print(f"  ✓ {msg}")
+    try:
+        if _has_rich():
+            from rich.console import Console
+            Console().print(f"  [green]✓[/] {msg}")
+        else:
+            print(f"  ✓ {msg}")
+    except Exception:
+        print(f"  [OK] {msg}")
 
 
 def _print_skip(msg: str):
-    pass  # Skip optional backends silently
+    try:
+        if _has_rich():
+            from rich.console import Console
+            Console().print(f"  [dim]⊘ {msg}[/]")
+        else:
+            print(f"  [SKIP] {msg}")
+    except Exception:
+        print(f"  [SKIP] {msg}")
 
 
 class AgentRouter:

@@ -2,7 +2,7 @@
 """
 High-performance C/C++ native bridge for JARVIS MK37.
 Provides fast FNV-1a hashing, C-level audio VAD energy calculation,
-hardware grid coordinate transform, and low-overhead system metrics.
+fast cosine vector distance calculations, and low-overhead system metrics.
 Includes pure-Python fallbacks when compiled native binary is unavailable.
 """
 from __future__ import annotations
@@ -36,7 +36,6 @@ _native_version: str       = "Python Fallback"
 def _init_native():
     global _c_lib, _native_loaded, _native_version
     if not LIB_PATH.exists():
-        # Try compiling on the fly
         try:
             from setup_native import compile_native
             compile_native()
@@ -53,6 +52,14 @@ def _init_native():
 
             _c_lib.jarvis_audio_energy.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_size_t]
             _c_lib.jarvis_audio_energy.restype  = ctypes.c_float
+
+            if hasattr(_c_lib, "jarvis_vector_dot_product"):
+                _c_lib.jarvis_vector_dot_product.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_size_t]
+                _c_lib.jarvis_vector_dot_product.restype  = ctypes.c_float
+
+            if hasattr(_c_lib, "jarvis_fast_cosine_distance"):
+                _c_lib.jarvis_fast_cosine_distance.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_size_t]
+                _c_lib.jarvis_fast_cosine_distance.restype  = ctypes.c_float
 
             _c_lib.jarvis_grid_transform.argtypes = [
                 ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
@@ -101,8 +108,29 @@ def fast_hash(data: bytes) -> int:
             return _c_lib.jarvis_fast_hash(buf, len(data))
         except Exception:
             pass
-    # Pure Python fallback using hashlib MD5 truncated to 64-bit uint
     return int(hashlib.md5(data).hexdigest()[:16], 16)
+
+
+def fast_cosine_distance(v1: list[float], v2: list[float]) -> float:
+    """Calculate fast cosine distance (1.0 - cosine_similarity)."""
+    if not v1 or not v2 or len(v1) != len(v2):
+        return 1.0
+    if _native_loaded and _c_lib and hasattr(_c_lib, "jarvis_fast_cosine_distance"):
+        try:
+            dim = len(v1)
+            arr1 = (ctypes.c_float * dim)(*v1)
+            arr2 = (ctypes.c_float * dim)(*v2)
+            return float(_c_lib.jarvis_fast_cosine_distance(arr1, arr2, dim))
+        except Exception:
+            pass
+    # Pure Python fallback
+    dot = sum(a * b for a, b in zip(v1, v2))
+    norm1 = math.sqrt(sum(a * a for a in v1))
+    norm2 = math.sqrt(sum(b * b for b in v2))
+    if norm1 <= 0 or norm2 <= 0:
+        return 1.0
+    sim = dot / (norm1 * norm2)
+    return max(0.0, 1.0 - sim)
 
 
 def audio_energy(samples: list[float] | tuple[float, ...]) -> float:
@@ -115,12 +143,10 @@ def audio_energy(samples: list[float] | tuple[float, ...]) -> float:
             return float(_c_lib.jarvis_audio_energy(c_arr, len(samples)))
         except Exception:
             pass
-    # Pure Python fallback
     try:
         sum_sq = sum(s * s for s in samples)
         return math.sqrt(sum_sq / len(samples))
     except OverflowError:
-        # Safeguard: handle float overflow by scaling down values before computation
         max_val = max(abs(s) for s in samples)
         if max_val == 0.0:
             return 0.0
@@ -140,7 +166,6 @@ def grid_transform(x_norm: int, y_norm: int, screen_w: int, screen_h: int) -> tu
         except Exception:
             pass
 
-    # Pure Python fallback
     px = int((float(x_norm) / 1000.0) * float(screen_w))
     py = int((float(y_norm) / 1000.0) * float(screen_h))
     px = max(0, min(screen_w - 1, px)) if screen_w > 0 else 0

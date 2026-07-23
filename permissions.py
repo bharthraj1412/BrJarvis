@@ -49,8 +49,6 @@ ALWAYS_ALLOWED: FrozenSet[str] = frozenset(
         "screen_find",
         "screen_click",
         "smart_click",
-        "run_code",
-        "nmap_scan",
     }
 )
 

@@ -1,4 +1,4 @@
-# history/session_store.py
+# history/session_store.py — SQLite-backed Session History Store for JARVIS MK37
 """
 SQLite-backed persistent session and turn storage for JARVIS MK37.
 
@@ -9,8 +9,11 @@ Schema:
   turns    — every user/assistant exchange and tool call
   tags     — free-form session tags for filtering
 
-Thread-safe: all writes go through a threading.Lock().
-Auto-creates the DB and tables on first use.
+Features:
+  - Thread-safe write lock
+  - WAL journal mode for fast concurrent reads
+  - Full-Text Search (FTS5) for instant phrase search across past sessions
+  - Automatic session cleanup & retention policies
 """
 from __future__ import annotations
 
@@ -28,18 +31,20 @@ _DB_PATH = _DB_DIR / "sessions.db"
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS sessions (
-    id          TEXT PRIMARY KEY,
-    start_ts    INTEGER NOT NULL,
-    end_ts      INTEGER,
-    mode        TEXT NOT NULL DEFAULT 'general',
-    backend     TEXT NOT NULL DEFAULT 'gemini',
-    turn_count  INTEGER NOT NULL DEFAULT 0,
-    summary     TEXT
+    id             TEXT PRIMARY KEY,
+    start_ts       INTEGER NOT NULL,
+    end_ts         INTEGER,
+    last_active_ts INTEGER NOT NULL,
+    mode           TEXT NOT NULL DEFAULT 'general',
+    backend        TEXT NOT NULL DEFAULT 'gemini',
+    turn_count     INTEGER NOT NULL DEFAULT 0,
+    total_tokens   INTEGER NOT NULL DEFAULT 0,
+    summary        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS turns (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id  TEXT NOT NULL REFERENCES sessions(id),
+    session_id  TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     ts          INTEGER NOT NULL,
     role        TEXT NOT NULL,
     content     TEXT NOT NULL DEFAULT '',
@@ -51,7 +56,7 @@ CREATE TABLE IF NOT EXISTS turns (
 );
 
 CREATE TABLE IF NOT EXISTS tags (
-    session_id  TEXT NOT NULL REFERENCES sessions(id),
+    session_id  TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     tag         TEXT NOT NULL,
     PRIMARY KEY (session_id, tag)
 );
@@ -59,9 +64,9 @@ CREATE TABLE IF NOT EXISTS tags (
 CREATE INDEX IF NOT EXISTS idx_turns_session ON turns(session_id);
 CREATE INDEX IF NOT EXISTS idx_turns_ts ON turns(ts);
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_active ON sessions(last_active_ts);
 """
 
-# Full-text search virtual table (created separately so it can fail gracefully)
 _FTS_SQL = """
 CREATE VIRTUAL TABLE IF NOT EXISTS turns_fts USING fts5(
     content,
@@ -76,6 +81,10 @@ _FTS_TRIGGER_SQL = """
 CREATE TRIGGER IF NOT EXISTS turns_ai AFTER INSERT ON turns BEGIN
     INSERT INTO turns_fts(rowid, content, tool_name, tool_result)
     VALUES (new.id, new.content, new.tool_name, new.tool_result);
+END;
+CREATE TRIGGER IF NOT EXISTS turns_ad AFTER DELETE ON turns BEGIN
+    INSERT INTO turns_fts(turns_fts, rowid, content, tool_name, tool_result)
+    VALUES ('delete', old.id, old.content, old.tool_name, old.tool_result);
 END;
 """
 
@@ -131,8 +140,8 @@ class SessionStore:
         with self._lock:
             conn = self._get_conn()
             conn.execute(
-                "INSERT INTO sessions (id, start_ts, mode, backend) VALUES (?, ?, ?, ?)",
-                (session_id, now, mode, backend),
+                "INSERT INTO sessions (id, start_ts, last_active_ts, mode, backend) VALUES (?, ?, ?, ?, ?)",
+                (session_id, now, now, mode, backend),
             )
             conn.commit()
         return session_id
@@ -147,6 +156,7 @@ class SessionStore:
         tool_result: str | None = None,
         backend: str | None = None,
         latency_ms: int | None = None,
+        tokens_used: int = 0,
     ) -> int:
         """Record a single turn (user message, assistant response, or tool call).
 
@@ -174,8 +184,8 @@ class SessionStore:
                 (session_id, now, role, content[:10000], tool_name, args_str, result_str, backend, latency_ms),
             )
             conn.execute(
-                "UPDATE sessions SET turn_count = turn_count + 1 WHERE id = ?",
-                (session_id,),
+                "UPDATE sessions SET turn_count = turn_count + 1, last_active_ts = ?, total_tokens = total_tokens + ? WHERE id = ?",
+                (now, tokens_used, session_id),
             )
             conn.commit()
             return cur.lastrowid  # type: ignore[return-value]
@@ -186,10 +196,27 @@ class SessionStore:
         with self._lock:
             conn = self._get_conn()
             conn.execute(
-                "UPDATE sessions SET end_ts = ?, summary = ? WHERE id = ?",
-                (now, summary, session_id),
+                "UPDATE sessions SET end_ts = ?, last_active_ts = ?, summary = ? WHERE id = ?",
+                (now, now, summary, session_id),
             )
             conn.commit()
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session and all associated turns and tags."""
+        with self._lock:
+            conn = self._get_conn()
+            cur = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+    def clear_old_sessions(self, max_age_days: int = 60) -> int:
+        """Delete sessions older than max_age_days. Returns number of sessions deleted."""
+        cutoff_ts = int(time.time()) - (max_age_days * 86400)
+        with self._lock:
+            conn = self._get_conn()
+            cur = conn.execute("DELETE FROM sessions WHERE last_active_ts < ?", (cutoff_ts,))
+            conn.commit()
+            return cur.rowcount
 
     def tag_session(self, session_id: str, tag: str) -> None:
         """Add a tag to a session."""
@@ -216,7 +243,7 @@ class SessionStore:
         session = dict(row)
 
         turns = conn.execute(
-            "SELECT * FROM turns WHERE session_id = ? ORDER BY ts ASC",
+            "SELECT * FROM turns WHERE session_id = ? ORDER BY ts ASC, id ASC",
             (session_id,),
         ).fetchall()
         session["turns"] = [dict(t) for t in turns]
@@ -230,11 +257,23 @@ class SessionStore:
         return session
 
     def recent(self, n: int = 10) -> list[dict]:
-        """Return the N most recent session summaries (no turns)."""
+        """Return the N most recently active session summaries."""
         conn = self._get_conn()
         rows = conn.execute(
-            "SELECT * FROM sessions ORDER BY start_ts DESC LIMIT ?",
+            "SELECT * FROM sessions ORDER BY last_active_ts DESC LIMIT ?",
             (n,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_sessions_by_tag(self, tag: str, limit: int = 20) -> list[dict]:
+        """Return sessions matching a given tag."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT s.* FROM sessions s
+               JOIN tags t ON s.id = t.session_id
+               WHERE t.tag = ?
+               ORDER BY s.last_active_ts DESC LIMIT ?""",
+            (tag.lower().strip(), limit),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -281,7 +320,7 @@ class SessionStore:
         avg_row = conn.execute(
             "SELECT AVG(turn_count) FROM sessions WHERE turn_count > 0"
         ).fetchone()
-        avg_turns = round(avg_row[0], 1) if avg_row[0] else 0
+        avg_turns = round(avg_row[0], 1) if avg_row and avg_row[0] else 0
 
         backends_row = conn.execute(
             "SELECT backend, COUNT(*) as cnt FROM sessions GROUP BY backend ORDER BY cnt DESC"
@@ -289,7 +328,7 @@ class SessionStore:
         backend_dist = {r["backend"]: r["cnt"] for r in backends_row}
 
         first_row = conn.execute("SELECT MIN(start_ts) FROM sessions").fetchone()
-        last_row = conn.execute("SELECT MAX(start_ts) FROM sessions").fetchone()
+        last_row = conn.execute("SELECT MAX(last_active_ts) FROM sessions").fetchone()
 
         return {
             "total_sessions": total_sessions,
@@ -297,8 +336,8 @@ class SessionStore:
             "tool_calls": tool_calls,
             "avg_turns_per_session": avg_turns,
             "backend_distribution": backend_dist,
-            "first_session_ts": first_row[0],
-            "last_session_ts": last_row[0],
+            "first_session_ts": first_row[0] if first_row else None,
+            "last_session_ts": last_row[0] if last_row else None,
             "db_path": str(self._db_path),
             "db_size_kb": round(self._db_path.stat().st_size / 1024, 1) if self._db_path.exists() else 0,
         }

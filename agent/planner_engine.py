@@ -14,7 +14,8 @@ logger = logging.getLogger("JARVIS.PlannerEngine")
 # Keywords that trigger elevated risk and require human approval
 DESTRUCTIVE_KEYWORDS = {
     "delete", "remove", "format", "push", "deploy", "drop", "purge",
-    "purchase", "buy", "pay", "shutdown", "reboot", "uninstall", "kill"
+    "purchase", "buy", "pay", "shutdown", "reboot", "uninstall", "kill",
+    "wipe", "destroy", "format_disk"
 }
 
 
@@ -36,7 +37,7 @@ class PlannerEngine:
 
         for kw in DESTRUCTIVE_KEYWORDS:
             if kw in text_content:
-                if kw in ("format", "purge", "shutdown", "drop"):
+                if kw in ("format", "purge", "shutdown", "drop", "wipe"):
                     return RiskLevel.CRITICAL, True
                 return RiskLevel.HIGH, True
 
@@ -44,6 +45,26 @@ class PlannerEngine:
             return RiskLevel.MEDIUM, False
 
         return RiskLevel.LOW, False
+
+    def _validate_dag(self, steps: List[TaskStepNode]) -> None:
+        """Validate DAG to guarantee no cyclic dependencies exist."""
+        adj = {s.step_id: s.depends_on for s in steps}
+        visited = set()
+        rec_stack = set()
+
+        def dfs(node_id: int):
+            visited.add(node_id)
+            rec_stack.add(node_id)
+            for neighbor in adj.get(node_id, []):
+                if neighbor not in visited:
+                    dfs(neighbor)
+                elif neighbor in rec_stack:
+                    raise ValueError(f"Cyclic dependency detected in GoalGraph step #{node_id} -> #{neighbor}")
+            rec_stack.remove(node_id)
+
+        for s in steps:
+            if s.step_id not in visited:
+                dfs(s.step_id)
 
     def create_goal_graph(self, goal: str, raw_steps: List[Dict[str, Any]]) -> GoalGraph:
         """Construct a validated, risk-assessed GoalGraph DAG from plan steps."""
@@ -60,6 +81,9 @@ class PlannerEngine:
             parallel = step_data.get("parallel", False)
             critical = step_data.get("critical", True)
 
+            # Sanitize depends_on to valid step IDs < idx
+            valid_depends = [d for d in depends_on if isinstance(d, int) and 1 <= d < idx]
+
             risk_level, requires_approval = self._assess_risk(desc, tool, params)
             if requires_approval:
                 has_approval_required = True
@@ -69,7 +93,7 @@ class PlannerEngine:
                 tool=tool,
                 description=desc,
                 parameters=params,
-                depends_on=depends_on,
+                depends_on=valid_depends,
                 parallel=parallel,
                 critical=critical,
                 risk_level=risk_level,
@@ -78,6 +102,9 @@ class PlannerEngine:
             steps.append(step_node)
             est_time += 2.5
             est_tokens += 150
+
+        # Validate DAG topology
+        self._validate_dag(steps)
 
         graph = GoalGraph(
             goal=goal,
@@ -106,10 +133,8 @@ class PlannerEngine:
         new_steps: List[TaskStepNode] = []
         for s in graph.steps:
             if s.step_id < failed_step_id:
-                # Retain completed steps
                 new_steps.append(s)
             elif s.step_id == failed_step_id:
-                # Modify failed step with recovery fallback strategy
                 recovery_step = s.model_copy(update={
                     "description": f"Fallback recovery: {s.description}",
                     "status": StepStatus.PENDING,
@@ -118,7 +143,6 @@ class PlannerEngine:
                 })
                 new_steps.append(recovery_step)
             else:
-                # Retain remaining steps with status reset
                 new_steps.append(s.model_copy(update={"status": StepStatus.PENDING}))
 
         replanned_graph = graph.model_copy(update={"steps": new_steps})

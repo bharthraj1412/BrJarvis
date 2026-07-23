@@ -1,16 +1,4 @@
-# screen_server/ws_server.py
-"""
-Asyncio WebSocket server for JARVIS MK37 screen sharing.
-
-Broadcasts JPEG frames to all connected viewers. Supports optional
-Bearer token authentication.
-
-Protocol:
-  1. On connect, server sends a JSON "meta" message:
-     {"type": "meta", "width": W, "height": H, "fps": F}
-  2. Then sends raw binary JPEG frames continuously.
-  3. Viewer disconnect is handled gracefully.
-"""
+# screen_server/ws_server.py — Asyncio WebSocket Server for JARVIS MK37 Screen Sharing
 from __future__ import annotations
 
 import asyncio
@@ -30,14 +18,19 @@ except ImportError:
 class ScreenShareServer:
     """Manages WebSocket connections and frame broadcasting."""
 
-    def __init__(self, port: int = 8765, token: str | None = None):
+    def __init__(self, port: int = 8765, token: str | None = None, ssl_context: Any | None = None):
         self.port = port
         self.token = token
+        self.ssl_context = ssl_context
         self.host = os.environ.get("SCREEN_SHARE_HOST", "127.0.0.1")
         self.meta: dict = {"type": "meta", "width": 1920, "height": 1080, "fps": 10}
         self._viewers: Set[Any] = set()
         self._viewers_lock = threading.Lock()
         self._server: Any = None
+
+    def update_meta(self, width: int, height: int, fps: int = 10) -> None:
+        """Update stream resolution and frame rate metadata."""
+        self.meta.update({"width": width, "height": height, "fps": fps})
 
     @property
     def viewer_count(self) -> int:
@@ -49,7 +42,6 @@ class ScreenShareServer:
         # Token authentication
         if self.token:
             try:
-                # Check for auth in the first message or headers
                 auth_header = ""
                 if hasattr(websocket, "request") and hasattr(websocket.request, "headers"):
                     auth_header = websocket.request.headers.get("Authorization", "")
@@ -57,7 +49,6 @@ class ScreenShareServer:
                     auth_header = websocket.request_headers.get("Authorization", "")
 
                 if auth_header != f"Bearer {self.token}":
-                    # Try reading first message as auth
                     try:
                         first_msg = await asyncio.wait_for(websocket.recv(), timeout=5.0)
                         if isinstance(first_msg, str):
@@ -83,9 +74,8 @@ class ScreenShareServer:
             self._viewers.add(websocket)
 
         try:
-            # Keep connection alive — just wait for disconnect
             async for _ in websocket:
-                pass  # Ignore any messages from viewers
+                pass  # Keep connection open until client disconnects
         except Exception:
             pass
         finally:
@@ -97,12 +87,18 @@ class ScreenShareServer:
         if not _ws_available:
             raise RuntimeError("websockets library not installed. Run: pip install websockets")
 
+        kwargs = {}
+        if self.ssl_context:
+            kwargs["ssl"] = self.ssl_context
+
         self._server = await ws_serve(
             self._handler,
             self.host,
             self.port,
+            **kwargs
         )
-        print(f"[ScreenShare] WebSocket server listening on ws://{self.host}:{self.port}")
+        protocol = "wss" if self.ssl_context else "ws"
+        print(f"[ScreenShare] WebSocket server listening on {protocol}://{self.host}:{self.port}")
 
     async def stop(self) -> None:
         """Stop the WebSocket server and disconnect all viewers."""
@@ -111,7 +107,6 @@ class ScreenShareServer:
             await self._server.wait_closed()
             self._server = None
 
-        # Close all viewer connections
         with self._viewers_lock:
             viewers_copy = set(self._viewers)
             self._viewers.clear()
@@ -132,7 +127,6 @@ class ScreenShareServer:
         if not viewers_copy:
             return
 
-        # Send to all viewers concurrently, drop disconnected or slow ones
         async def _send_to_viewer(ws):
             try:
                 await asyncio.wait_for(ws.send(frame_data), timeout=2.0)

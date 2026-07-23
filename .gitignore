@@ -45,3 +45,21 @@ logs/
 *.pdf
 .jarvis.pid
 
+# Guardian state
+.guardian_hashes.json
+guardian/PAUSED
+
+# Native binaries
+native/*.dll
+native/*.so
+native/*.dylib
+
+# Generated reports
+reports/
+
+# Scratch / workspace
+scratch/
+workspace/
+BR_WORKSPACE/
+*.txt
+~$*

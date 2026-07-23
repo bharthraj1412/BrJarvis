@@ -148,9 +148,18 @@ class JarvisOrchestrator:
             return f"[JARVIS] Unknown mode: '{mode}'. Available: {', '.join(MODES.keys())}"
         return None
 
+    _tool_prompt_cache: str = ""  # class-level cache for tool prompt block
+
     def _build_system(self, user_prompt: str = "") -> str:
         name = os.environ.get("JARVIS_ASSISTANT_NAME", "BR").strip()
-        sys_prompt = f"You are {name}, an ultra-fast autonomous AI assistant. Think step-by-step, act decisively, avoid filler."
+        sys_prompt = (
+            f"You are {name}, an ultra-fast autonomous AI assistant. Think step-by-step, act decisively, avoid filler.\n"
+            "CRITICAL EXPORT & TOOL CALL RULES:\n"
+            "1. When asked to create, recreate, generate, or export a report, document, or spreadsheet (Excel/Word/PDF), "
+            "YOU MUST IMMEDIATELY INVOKE THE TOOL (e.g. ```tool_call\n{\"tool\": \"create_excel_sheet\", \"args\": {...}}\n```).\n"
+            "2. NEVER output unexecuted thoughts like 'Generate report content. Now call create_word_document.' as plain text.\n"
+            "3. If the user explicitly asks for an Excel file ('i need excel document', 'create excel sheet'), ALWAYS call `create_excel_sheet` with structured data rows, headers, and filename ending in .xlsx."
+        )
         parts = [sys_prompt]
         mode_text = MODES.get(self.current_mode, "")
         if mode_text:
@@ -158,7 +167,14 @@ class JarvisOrchestrator:
 
         try:
             from tools.registry import get_pruned_tool_prompt_block
-            parts.append(get_pruned_tool_prompt_block(user_prompt))
+            if user_prompt:
+                parts.append(get_pruned_tool_prompt_block(user_prompt))
+            elif not JarvisOrchestrator._tool_prompt_cache:
+                from tools.registry import get_tool_prompt_block
+                JarvisOrchestrator._tool_prompt_cache = get_tool_prompt_block()
+                parts.append(JarvisOrchestrator._tool_prompt_cache)
+            else:
+                parts.append(JarvisOrchestrator._tool_prompt_cache)
         except Exception:
             from tools.registry import get_tool_prompt_block
             parts.append(get_tool_prompt_block())
@@ -185,8 +201,12 @@ class JarvisOrchestrator:
     def _recall_context(self, user_input: str) -> str:
         if not self.vector_memory:
             return ""
-        # Skip trivial inputs (greetings, short phrases)
-        if len(user_input.split()) < 3:
+        # Skip trivial inputs (greetings, short phrases, simple commands)
+        if len(user_input.split()) < 4:
+            return ""
+        # Skip obvious command patterns that don't benefit from memory recall
+        low = user_input.lower().strip()
+        if low.startswith(("open ", "launch ", "start ", "close ", "stop ", "/")):
             return ""
         try:
             results = self.vector_memory.search(user_input, top_k=2)
@@ -300,8 +320,12 @@ class JarvisOrchestrator:
         memory_ctx = self._recall_context(user_input)
         augmented  = f"{memory_ctx}{user_input}" if memory_ctx else user_input
 
-        self.working_memory.add("user", augmented)
-        self._record_turn("user", user_input)
+        # Smart Context Trimming to maintain sub-300ms inference latency
+        try:
+            if hasattr(self.working_memory, "trim") and len(self.working_memory.get()) > 10:
+                self.working_memory.trim(max_turns=10)
+        except Exception:
+            pass
 
         keywords = self._extract_keywords(user_input)
         profile  = self.router.route(keywords)
@@ -309,7 +333,7 @@ class JarvisOrchestrator:
 
         final_response = ""
         success = True
-        _consecutive_tool: dict = {"name": None, "count": 0}  # duplicate-call guard
+        _consecutive_tool: dict = {"name": None, "args_str": None, "count": 0}  # duplicate-call guard
 
         for step in range(MAX_REACT_STEPS):
             t_start = time.monotonic()
@@ -332,14 +356,16 @@ class JarvisOrchestrator:
 
             if tool_name:
                 # ── Duplicate-call guard ──────────────────────────────────
-                if tool_name == _consecutive_tool["name"]:
+                import json
+                args_str = json.dumps(tool_args or {}, sort_keys=True)
+                if tool_name == _consecutive_tool["name"] and args_str == _consecutive_tool.get("args_str"):
                     _consecutive_tool["count"] += 1
                 else:
-                    _consecutive_tool = {"name": tool_name, "count": 1}
+                    _consecutive_tool = {"name": tool_name, "args_str": args_str, "count": 1}
 
-                if _consecutive_tool["count"] >= 3:
+                if _consecutive_tool["count"] >= 2:
                     print(f"[JARVIS] ⚠️ Duplicate-call guard triggered for '{tool_name}' (x{_consecutive_tool['count']})")
-                    if _consecutive_tool["count"] >= 5:
+                    if _consecutive_tool["count"] >= 3:
                         final_response = (
                             f"[JARVIS] Duplicate tool execution stopped after {_consecutive_tool['count']} attempts. "
                             f"Execution completed."
