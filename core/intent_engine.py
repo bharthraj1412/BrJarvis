@@ -472,6 +472,58 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0w. Match Active Process Count Telemetry Intent
+        if any(phrase in clean for phrase in ["count active processes", "how many processes are running", "process count", "running processes count"]):
+            try:
+                import psutil
+                pids = psutil.pids()
+                return {
+                    "executed": True,
+                    "intent": "process_count",
+                    "target": "process_manager",
+                    "result": f"⚙️ Process Telemetry:\n• Total Active System Processes: {len(pids)} PIDs running",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0x. Match Virtual Environment Status Intent
+        if any(phrase in clean for phrase in ["check venv", "virtual environment status", "is venv active", "venv status"]):
+            try:
+                in_venv = sys.prefix != sys.base_prefix
+                venv_str = f"Active ({sys.prefix})" if in_venv else "Inactive (Global System Python)"
+                return {
+                    "executed": True,
+                    "intent": "venv_status",
+                    "target": "python_environment",
+                    "result": f"🐍 Virtual Environment Status:\n• Virtualenv State: {venv_str}\n• Base Prefix: {sys.base_prefix}",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0y. Match Environment Variables Summary Intent
+        if any(phrase in clean for phrase in ["check environment variables", "list env vars", "env vars", "environment variables"]):
+            try:
+                key_vars = ["PYTHONPATH", "OPENAI_API_KEY", "GEMINI_API_KEY", "OS", "NUMBER_OF_PROCESSORS", "PATH"]
+                env_lines = []
+                for k in key_vars:
+                    val = os.environ.get(k)
+                    if val:
+                        display_val = "Set (Configured)" if "KEY" in k else (val[:50] + "..." if len(val) > 50 else val)
+                        env_lines.append(f"• {k}: {display_val}")
+                    else:
+                        env_lines.append(f"• {k}: Not set")
+                return {
+                    "executed": True,
+                    "intent": "env_vars",
+                    "target": "os_environment",
+                    "result": "🔑 Key Environment Variables:\n" + "\n".join(env_lines),
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
