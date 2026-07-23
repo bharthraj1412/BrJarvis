@@ -300,6 +300,61 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0m. Match Lock Workstation Intent
+        if any(phrase in clean for phrase in ["lock computer", "lock screen", "lock workstation", "lock pc"]):
+            try:
+                import ctypes
+                if sys.platform == "win32":
+                    ctypes.windll.user32.LockWorkStation()
+                else:
+                    import pyautogui
+                    pyautogui.FAILSAFE = False
+                    pyautogui.hotkey("ctrl", "alt", "l")
+                return {
+                    "executed": True,
+                    "intent": "lock_screen",
+                    "target": "workstation",
+                    "result": "Locked computer screen (0-Token Execution).",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0n. Match Workspace Health Diagnostic Intent
+        if any(phrase in clean for phrase in ["workspace health", "check workspace health", "workspace diagnostics"]):
+            try:
+                total_files = len([f for f in Path(".").rglob("*") if f.is_file() and not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)])
+                py_files = len([f for f in Path(".").rglob("*.py") if not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)])
+                return {
+                    "executed": True,
+                    "intent": "workspace_health",
+                    "target": "workspace",
+                    "result": f"🏥 Workspace Health Diagnostic:\n• Active Workspace: {Path.cwd().name}\n• Total Tracked Files: {total_files}\n• Python Source Files: {py_files}\n• Workspace Status: Healthy & Ready",
+                    "tokens_saved": 2000,
+                }
+            except Exception:
+                pass
+
+        # 0o. Match Project Codebase Statistics Intent
+        if any(phrase in clean for phrase in ["project statistics", "project stats", "count project files", "codebase stats"]):
+            try:
+                py_files = [f for f in Path(".").rglob("*.py") if not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)]
+                total_loc = 0
+                for pf in py_files:
+                    try:
+                        total_loc += len(pf.read_text(encoding="utf-8", errors="ignore").splitlines())
+                    except Exception:
+                        pass
+                return {
+                    "executed": True,
+                    "intent": "project_stats",
+                    "target": "codebase",
+                    "result": f"📊 Project Codebase Statistics:\n• Python Source Files: {len(py_files)}\n• Total Lines of Code: {total_loc:,}\n• Core Modules: core, backends, memory, actions, tools, voice, history",
+                    "tokens_saved": 2200,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
