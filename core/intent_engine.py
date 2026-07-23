@@ -593,6 +593,57 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0ad. Match Active Git Branch Intent
+        if any(phrase in clean for phrase in ["current git branch", "what is the git branch", "git branch", "active branch"]):
+            try:
+                branch = subprocess.check_output(["git", "branch", "--show-current"], text=True, timeout=2.0).strip()
+                return {
+                    "executed": True,
+                    "intent": "git_branch",
+                    "target": "git_repo",
+                    "result": f"🌿 Active Git Branch: '{branch}'",
+                    "tokens_saved": 1200,
+                }
+            except Exception:
+                pass
+
+        # 0ae. Match Installed Python Packages Telemetry Intent
+        if any(phrase in clean for phrase in ["installed python packages", "count pip packages", "pip packages", "python packages"]):
+            try:
+                import importlib.metadata
+                pkgs = list(importlib.metadata.distributions())
+                key_names = ["psutil", "pillow", "chromadb", "pyautogui", "openai", "requests", "edge-tts", "fastapi"]
+                found_keys = [f"{p.metadata['Name']} ({p.version})" for p in pkgs if p.metadata['Name'].lower() in key_names]
+                res_str = f"📦 Installed Python Packages Telemetry:\n• Total Installed Packages: {len(pkgs)} packages\n• Key Libraries Detected: {', '.join(found_keys)}"
+                return {
+                    "executed": True,
+                    "intent": "pip_packages",
+                    "target": "python_environment",
+                    "result": res_str,
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
+        # 0af. Match System Clipboard Inspection Intent
+        if any(phrase in clean for phrase in ["read clipboard", "check clipboard", "clipboard content", "what is on clipboard"]):
+            try:
+                import tkinter as tk
+                root = tk.Tk()
+                root.withdraw()
+                clip_text = root.clipboard_get()
+                root.destroy()
+                preview = clip_text[:120].replace("\n", " ") + ("..." if len(clip_text) > 120 else "")
+                return {
+                    "executed": True,
+                    "intent": "read_clipboard",
+                    "target": "system_clipboard",
+                    "result": f"📋 System Clipboard Inspection:\n• Content Length: {len(clip_text)} characters\n• Preview: \"{preview}\"",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
