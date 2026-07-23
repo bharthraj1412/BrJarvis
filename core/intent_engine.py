@@ -247,6 +247,59 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0j. Match Show Desktop / Minimize All Windows Intent
+        if any(phrase in clean for phrase in ["show desktop", "minimize all windows", "minimize all", "desktop view"]):
+            try:
+                import pyautogui
+                pyautogui.FAILSAFE = False
+                pyautogui.hotkey("win", "d")
+                return {
+                    "executed": True,
+                    "intent": "show_desktop",
+                    "target": "desktop",
+                    "result": "Toggled Show Desktop / Minimized All Windows (0-Token Execution).",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0k. Match Workspace File Discovery Intent (e.g., "find pdf files in workspace", "list python files")
+        file_disc_match = re.search(r"^(?:find|list|search|show)\s+([a-z0-9]+)\s+files", clean)
+        if file_disc_match:
+            try:
+                ext = file_disc_match.group(1).lower()
+                ext_str = f".{ext}" if not ext.startswith(".") else ext
+                matched_files = list(Path(".").rglob(f"*{ext_str}"))
+                matched_files = [f for f in matched_files if not any(part.startswith(".") or part in ["venv", "__pycache__", "node_modules"] for part in f.parts)]
+                res_lines = [f"• {f}" for f in matched_files[:10]]
+                res_text = "\n".join(res_lines) if res_lines else f"No {ext.upper()} files found in workspace."
+                return {
+                    "executed": True,
+                    "intent": "file_discovery",
+                    "target": ext_str,
+                    "result": f"📁 Workspace {ext.upper()} Files ({len(matched_files)} found):\n{res_text}",
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
+        # 0l. Match RAM Memory Freeing Intent
+        if any(phrase in clean for phrase in ["free ram memory", "free ram", "free memory", "flush ram"]):
+            try:
+                import gc
+                gc.collect()
+                from actions.process_optimizer import run_process_optimization
+                opt_msg = run_process_optimization(threshold_mb=200.0)
+                return {
+                    "executed": True,
+                    "intent": "free_memory",
+                    "target": "ram",
+                    "result": f"🧹 Python Garbage Collection Executed (RAM Flushed).\n{opt_msg}",
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
