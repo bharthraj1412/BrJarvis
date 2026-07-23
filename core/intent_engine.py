@@ -25,6 +25,8 @@ class DeterministicIntentEngine:
         "calculator": ["calc", "calc.exe"],
         "calc": ["calc", "calc.exe"],
         "chrome": ["chrome", "chrome.exe"],
+        "brave": ["brave", "brave.exe"],
+        "firefox": ["firefox", "firefox.exe"],
         "browser": ["msedge" if sys.platform == "win32" else "chrome"],
         "edge": ["msedge", "msedge.exe"],
         "vscode": ["code", "code.cmd"],

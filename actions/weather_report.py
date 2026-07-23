@@ -15,25 +15,30 @@ def weather_action(
     weather_text = _fetch_weather_data(city)
 
     if weather_text:
+        # Build a Google search URL so later 'open it in brave' can resolve it
+        from urllib.parse import quote_plus as _qp
+        google_url = f"https://www.google.com/search?q={_qp(f'weather in {city} {when}')}"
         # Also open browser for visual display if city specified
         if city:
-            url = f"https://www.google.com/search?q={quote_plus(f'weather in {city} {when}')}"
+            url = google_url
             try:
                 webbrowser.open(url)
             except Exception:
                 pass
 
-        _log(weather_text, player)
+        # Embed URL so context resolver can reopen in a specific browser
+        weather_text_with_url = weather_text + f"\nSearch URL: {google_url}"
+        _log(weather_text_with_url, player)
 
         if session_memory:
             try:
                 session_memory.set_last_search(
-                    query=f"weather in {city} {when}", response=weather_text
+                    query=f"weather in {city} {when}", response=weather_text_with_url
                 )
             except Exception:
                 pass
 
-        return weather_text
+        return weather_text_with_url
 
     # ── Fallback: open browser and return a clear completion message ──────
     search_query  = f"weather in {city} {when}"
@@ -48,8 +53,10 @@ def weather_action(
         _log(msg, player)
         return msg
 
+    # Embed URL so context resolver can reopen in a different browser on request
     msg = (
         f"Weather for {city} ({when}): Opened in browser. "
+        f"Search URL: {url} "
         f"[DONE — no further weather calls needed]"
     )
     _log(msg, player)

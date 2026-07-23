@@ -258,6 +258,71 @@ class JarvisOrchestrator:
             except Exception:
                 pass
 
+    def _resolve_context_references(self, user_input: str, augmented: str) -> str:
+        """
+        Resolve pronoun references like 'open it in brave' by injecting the last
+        JARVIS result URL or content into the augmented prompt.
+        """
+        low = user_input.lower().strip()
+        # Detect 'open it in <browser>' or 'open in <browser>' or 'show it in <browser>'
+        browser_names = ["brave", "chrome", "edge", "firefox", "browser"]
+        has_pronoun = any(w in low for w in ["open it", "open this", "show it", "show this", "open in", "show in"])
+        has_browser = any(b in low for b in browser_names)
+
+        if has_pronoun and has_browser:
+            # Find the last assistant response URL from working memory
+            last_url = None
+            for msg in reversed(self.working_memory.get()):
+                if msg.get("role") == "assistant" or msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    # Extract URL from content
+                    import re as _re
+                    urls = _re.findall(r'https?://[^\s"<>]+', content)
+                    if urls:
+                        last_url = urls[-1]
+                        break
+
+            # Determine which browser
+            target_browser = "brave"
+            for b in browser_names:
+                if b in low:
+                    target_browser = b
+                    break
+
+            if last_url:
+                # Quick-execute: open URL in chosen browser directly
+                try:
+                    import subprocess, shutil, sys
+                    # Windows browser paths
+                    browser_executables = {
+                        "brave": ["brave.exe", "brave"],
+                        "chrome": ["chrome.exe", "chrome", "google-chrome"],
+                        "edge": ["msedge.exe", "msedge"],
+                        "firefox": ["firefox.exe", "firefox"],
+                        "browser": ["brave.exe", "msedge.exe", "chrome.exe"],
+                    }
+                    executables = browser_executables.get(target_browser, ["brave.exe"])
+                    launched = False
+                    for exe in executables:
+                        if shutil.which(exe):
+                            subprocess.Popen([exe, last_url])
+                            launched = True
+                            break
+                    if not launched:
+                        # Fallback to start command on Windows
+                        subprocess.Popen(["cmd", "/c", "start", target_browser, last_url], shell=False)
+                    print(f"[Context] Resolved 'it' → {last_url} | Browser: {target_browser}")
+                    # Return an informative augment so LLM confirms it
+                    return augmented + f"\n[SYSTEM CONTEXT: 'it' refers to {last_url} — already opened in {target_browser}. Confirm to user.]"
+                except Exception as e:
+                    print(f"[Context] Browser launch failed: {e}")
+                    return augmented + f"\n[SYSTEM CONTEXT: The last result URL was {last_url}. Open it in {target_browser}.]"
+            else:
+                # No URL found — inject context so LLM can retrieve from memory
+                return augmented + f"\n[SYSTEM CONTEXT: User wants to open the previous result in {target_browser}. Check conversation history for URL.]"
+
+        return augmented
+
     def _check_skill(self, user_input: str) -> str | None:
         try:
             from skills import find_skill, execute_skill, load_skills
@@ -320,6 +385,9 @@ class JarvisOrchestrator:
         memory_ctx = self._recall_context(user_input)
         augmented  = f"{memory_ctx}{user_input}" if memory_ctx else user_input
 
+        # Context-aware pronoun/browser resolution: 'open it in brave/chrome/edge'
+        augmented = self._resolve_context_references(user_input, augmented)
+
         # Smart Context Trimming to maintain sub-300ms inference latency
         try:
             if hasattr(self.working_memory, "trim") and len(self.working_memory.get()) > 10:
@@ -327,9 +395,13 @@ class JarvisOrchestrator:
         except Exception:
             pass
 
+        # CRITICAL: Add user message to working memory BEFORE LLM call
+        self.working_memory.add("user", augmented)
+        self._record_turn("user", user_input)
+
         keywords = self._extract_keywords(user_input)
         profile  = self.router.route(keywords)
-        system   = self._build_system()
+        system   = self._build_system(user_input)
 
         final_response = ""
         success = True
