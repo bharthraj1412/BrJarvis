@@ -4,6 +4,28 @@ All major architectural updates, subsystem additions, and core refactorings are 
 
 ---
 
+## [37.25.0] — 2026-07-23
+
+### Critical Orchestrator Fix & Context Resolution Engine Upgrade
+- **Critical Conversation Context Fix (`orchestrator.chat()`)**:
+  - Resolved major conversation memory loss bug where the user message `augmented` string was constructed but never inserted into `WorkingMemory` prior to backend inference calls.
+  - Re-established turn recording (`_record_turn("user", user_input)`) before starting the ReAct execution loop.
+
+- **Context-Aware Pronoun & Browser Resolver (`orchestrator._resolve_context_references()`)**:
+  - Implemented automatic anaphoric pronoun resolution for queries like `"open it in brave"`, `"open this in chrome"`, or `"show in edge"`.
+  - Scans working memory history for recent output URLs (e.g. weather search URLs, RAG search URLs), directly launching the target browser (Brave, Chrome, Edge, Firefox) with the resolved URL.
+
+- **Live OS Vision Target Trace Overlay (`actions/live_os_control.py`)**:
+  - Implemented `_save_action_visualization()` drawing a red crosshair and target action footprint directly on target coordinates `(px_x, px_y)` for every executed step action.
+  - Saves visual traces to `BR_WORKSPACE/Logs/live_os/step_{step}_action.png`.
+  - Integrated dynamic `is_static` frame hash check to alert the vision model when click actions produce no screen change.
+
+- **Zero-Token Intent Engine Expansion (Rounds 8–24)**:
+  - Expanded `DeterministicIntentEngine` in `core/intent_engine.py` to 50+ instant 0-token matchers (Git branch, commit log, largest Python file, RAM free / garbage collection, battery, CPU frequency, disk partitions, swap memory, PATH environment, etc.).
+  - Added `"brave"` and `"firefox"` to `APP_MAPPINGS` in `intent_engine.py` and `open_app.py`.
+
+---
+
 ## [37.6.0] — 2026-07-22
 
 ### Verified & Synchronized — Full Architecture Audit & System Alignment
