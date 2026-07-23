@@ -642,7 +642,7 @@ class DeterministicIntentEngine:
                 pass
 
         # 0ad. Match Active Git Branch Intent
-        if any(phrase in clean for phrase in ["current git branch", "what is the git branch", "git branch", "active branch"]):
+        if any(phrase in clean for phrase in ["current git branch", "what is the git branch", "git branch", "active branch", "current branch", "check branch", "check current branch"]):
             try:
                 branch = subprocess.check_output(["git", "branch", "--show-current"], text=True, timeout=2.0).strip()
                 return {
