@@ -102,6 +102,25 @@ def transcribe(audio_bytes: bytes, language: str = "en", detect_language: bool =
     Returns:
         Transcribed text string, or empty string on failure.
     """
+    # ── RMS Silence Gate ──────────────────────────────────────────────────────
+    try:
+        import struct
+        import math
+        # WAV file header is 44 bytes, raw PCM starts after header
+        pcm_data = audio_bytes[44:] if len(audio_bytes) > 44 else audio_bytes
+        num_samples = len(pcm_data) // 2
+        if num_samples > 0:
+            samples = struct.unpack(f"<{num_samples}h", pcm_data[:num_samples * 2])
+            sum_squares = sum(s ** 2 for s in samples)
+            rms = math.sqrt(sum_squares / num_samples)
+            
+            min_rms = int(os.environ.get("JARVIS_AUDIO_MIN_RMS", "150"))
+            if rms < min_rms:
+                # Discard silent/static audio immediately to prevent CPU load and hallucinations
+                return ""
+    except Exception as e:
+        print(f"[WhisperLocal] Silence gate check failed: {e}")
+
     engine, engine_type = _get_engine()
     if engine is None:
         return ""
@@ -113,12 +132,35 @@ def transcribe(audio_bytes: bytes, language: str = "en", detect_language: bool =
             tmp.write(audio_bytes)
             tmp_path = tmp.name
 
+        text = ""
         if engine_type == "faster":
-            return _transcribe_faster(engine, tmp_path, language, detect_language)
+            text = _transcribe_faster(engine, tmp_path, language, detect_language)
         elif engine_type == "openai":
-            return _transcribe_openai(engine, tmp_path, language, detect_language)
-        else:
+            text = _transcribe_openai(engine, tmp_path, language, detect_language)
+
+        text_clean = text.strip()
+        if not text_clean:
             return ""
+
+        # ── Hallucination Pattern Filter ──────────────────────────────────────
+        normalized = ''.join(c for c in text_clean.lower() if c.isalnum() or c.isspace()).strip()
+        hallucinations = {
+            "thank you", "thank you very much", "thanks for watching", "bye", "you", 
+            "thank you thank you", "i know that", "i know that i know that", 
+            "people in kabul shouting watching flowers", "and pedals know nothing",
+            "보 but", "babe", "its definitely runche", "thats just the third place",
+            "were that close", "and we could speak well", "i love you", "i love you i love you",
+            "the full gym", "i dont know who that was right now", "i dont know if theyre not here",
+            "i have done it in there i have really had a good photo",
+            "they claim to be a lot more damucana bird", "perfect that kind candidates",
+            "aw the time here baron", "what are you talking about", "what is going on",
+            "what are you doing", "mostly", "lets go for it", "yeah", "sms"
+        }
+        if normalized in hallucinations:
+            return ""
+
+        return text_clean
+
     except Exception as e:
         print(f"[WhisperLocal] Transcription error: {e}")
         traceback.print_exc()

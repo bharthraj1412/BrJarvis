@@ -529,6 +529,16 @@ def t_resampler_phase_continuity():
 test("Resampler phase continuity", t_resampler_phase_continuity)
 
 
+def t_whisper_silence_gate_and_filter():
+    from voice.whisper_local import transcribe as whisper_transcribe
+    
+    # Total silence (bytes of 0) should be blocked by the RMS silence gate and return ""
+    silent_data = b"\x00" * 2000
+    res = whisper_transcribe(silent_data)
+    assert res == "", f"Expected empty string for silent audio, got '{res}'"
+test("Whisper silence gate skips silent audio", t_whisper_silence_gate_and_filter)
+
+
 # == Summary ==
 print("\n" + "=" * 60)
 print(f"  Results: {passed} passed, {failed} failed")
