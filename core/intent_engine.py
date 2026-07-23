@@ -71,6 +71,22 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0b. Match Time & Date Intent (e.g., "what time is it", "tell me the time", "what date is it")
+        if any(phrase in clean for phrase in ["what time", "current time", "tell me the time", "what date", "current date", "what day is it"]):
+            try:
+                from datetime import datetime
+                now = datetime.now()
+                time_str = now.strftime("The current time is %I:%M %p on %A, %B %d, %Y.")
+                return {
+                    "executed": True,
+                    "intent": "time_query",
+                    "target": "system_clock",
+                    "result": time_str,
+                    "tokens_saved": 1200,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
@@ -169,7 +185,7 @@ class DeterministicIntentEngine:
                 pass
 
         # 5. Match System Diagnostics Intent
-        if any(phrase in clean for phrase in ["system diagnostics", "top processes", "cpu usage", "ram usage"]):
+        if any(phrase in clean for phrase in ["system diagnostics", "system status", "check system", "computer status", "top processes", "cpu usage", "ram usage"]):
             try:
                 from tools.process_tools import get_system_diagnostics
                 diag_msg = get_system_diagnostics({})

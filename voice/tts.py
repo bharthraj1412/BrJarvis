@@ -51,14 +51,17 @@ _FILE_PATH_RX  = re.compile(r'(?:[A-Z]:\\|/)[^\s,;]+')
 _EMOJI_RX      = re.compile(r'[\U0001F300-\U0001FAFF\U00002702-\U000027B0]')
 _WHITESPACE_RX = re.compile(r'\s{2,}')
 
+_SYSTEM_TAGS_RX = re.compile(r'\[DONE[^\]]*\]|⚡\s*\[Antigravity Instant 0-Token Action\]|\[Tool:[^\]]*\]', re.IGNORECASE)
+
 def clean_for_speech(text: str) -> str:
-    """Remove tool calls, markdown, URLs, file paths, JSON blocks, and emojis from text for clean speech output."""
+    """Remove tool calls, markdown, URLs, file paths, JSON blocks, system tags, and emojis from text for clean speech output."""
     t = _TOOL_CALL_RX.sub('', text)
     t = _START_RX.sub('', t)
     t = _CHANNEL_RX.sub('', t)
     t = _MESSAGE_RX.sub('', t)
     t = _XML_TOKEN_RX.sub('', t)
     t = _JSON_BLOCK_RX.sub('', t)
+    t = _SYSTEM_TAGS_RX.sub('', t)
     t = _LINK_RX.sub(r'\1', t)       # [link text](url) → link text
     t = _URL_RX.sub('', t)
     t = _FILE_PATH_RX.sub('', t)
