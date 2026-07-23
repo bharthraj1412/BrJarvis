@@ -392,6 +392,42 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0r. Match Battery & Power Telemetry Intent
+        if any(phrase in clean for phrase in ["check battery status", "battery status", "battery level", "power status"]):
+            try:
+                import psutil
+                battery = psutil.sensors_battery()
+                if battery is None:
+                    res_text = "🔋 Power Source: Desktop PC / AC Power (No battery detected)."
+                else:
+                    plugged = "Plugged in (Charging)" if battery.power_plugged else "Discharging (On Battery)"
+                    res_text = f"🔋 Battery & Power Telemetry:\n• Battery Level: {battery.percent}%\n• Power State: {plugged}"
+                return {
+                    "executed": True,
+                    "intent": "battery_status",
+                    "target": "power_sensor",
+                    "result": res_text,
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0s. Match Workspace Git Status Intent
+        if any(phrase in clean for phrase in ["check git status", "git status", "repository status", "git info"]):
+            try:
+                out = subprocess.check_output(["git", "status", "-s"], text=True, timeout=3.0).strip()
+                branch = subprocess.check_output(["git", "branch", "--show-current"], text=True, timeout=2.0).strip()
+                status_msg = f"🌿 Git Repository Status (Branch: '{branch}'):\n" + (out if out else "• Working tree clean (No uncommitted changes).")
+                return {
+                    "executed": True,
+                    "intent": "git_status",
+                    "target": "git_repo",
+                    "result": status_msg,
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
