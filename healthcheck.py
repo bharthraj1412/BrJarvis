@@ -101,7 +101,7 @@ def test_backends() -> bool:
     for profile, backend in backends.items():
         start = time.monotonic()
         try:
-            ok = backend.ping(timeout=3.0)
+            ok = backend.ping(timeout=15.0)
             elapsed = (time.monotonic() - start) * 1000
             if ok:
                 _print(f"  ● {backend.name:10s} ({backend.model_name}) -> [green]ONLINE ({elapsed:.1f}ms)[/]")
