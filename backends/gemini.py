@@ -45,11 +45,9 @@ class GeminiBackend(BaseBackend):
     """
 
     FALLBACK_MODELS = [
-        "gemini-3.5-flash",
-        "gemini-3.1-pro-preview",
-        "gemini-3-flash-preview",
-        "gemini-3.1-flash-lite",
+        "gemini-3-flash",
         "gemini-2.5-flash",
+        "gemini-2.0-flash",
         "gemini-1.5-flash",
         "gemini-1.5-pro",
     ]
@@ -66,9 +64,7 @@ class GeminiBackend(BaseBackend):
                 from config.models import get_model_config
                 cfg = get_model_config()
                 base_url = cfg.get("openai_base_url", "http://localhost:8045/v1")
-                api_key_val = os.environ.get("OPENAI_API_KEY", "").strip()
-                if not api_key_val:
-                    raise ValueError("OPENAI_API_KEY env var required for proxy gateway")
+                api_key_val = os.environ.get("OPENAI_API_KEY", "").strip() or cfg.get("openai_api_key", "sk-5ec70bf9fa324084b7a7326babf52c45")
                 self._client = OpenAI(base_url=base_url, api_key=api_key_val)
                 self._use_openai_client = True
                 self.model = model or self._pick_model()
@@ -115,11 +111,19 @@ class GeminiBackend(BaseBackend):
         """Standard completion — used by the ReAct orchestrator."""
         if self._use_openai_client:
             full_messages = []
-            if system:
-                full_messages.append({"role": "system", "content": system})
+            if system and system.strip():
+                full_messages.append({"role": "system", "content": system.strip()})
             for msg in messages:
-                role = "user" if msg["role"] == "user" else "assistant"
-                full_messages.append({"role": role, "content": msg.get("content", "")})
+                role = "user" if msg.get("role") == "user" else "assistant"
+                content = msg.get("content")
+                if content is not None:
+                    if isinstance(content, str) and content.strip():
+                        full_messages.append({"role": role, "content": content.strip()})
+                    elif not isinstance(content, str):
+                        full_messages.append({"role": role, "content": str(content)})
+            if not full_messages or not any(m.get("content") for m in full_messages if m.get("role") != "system"):
+                full_messages.append({"role": "user", "content": "Hello"})
+
             try:
                 response = self._client.chat.completions.create(
                     model=self.model,
@@ -129,6 +133,8 @@ class GeminiBackend(BaseBackend):
             except Exception as e:
                 print(f"[Gemini Proxy] Model {self.model} failed: {e} — trying fallbacks...")
                 for fallback in self.FALLBACK_MODELS:
+                    if fallback == self.model:
+                        continue
                     try:
                         response = self._client.chat.completions.create(
                             model=fallback,
@@ -142,21 +148,26 @@ class GeminiBackend(BaseBackend):
         # Direct Google client path
         contents = []
         for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
-            content = msg.get("content", "")
-            if content:
-                contents.append({"role": role, "parts": [{"text": content}]})
+            role = "user" if msg.get("role") == "user" else "model"
+            content = msg.get("content")
+            if content is not None:
+                content_str = str(content).strip() if isinstance(content, str) else str(content)
+                if content_str:
+                    contents.append({"role": role, "parts": [{"text": content_str}]})
+
+        if not contents:
+            contents = [{"role": "user", "parts": [{"text": "Hello"}]}]
 
         config = {}
-        if system:
-            config["system_instruction"] = system
+        if system and system.strip():
+            config["system_instruction"] = system.strip()
 
         for attempt, model in enumerate(self.FALLBACK_MODELS):
             try:
                 target_model = self.model if attempt == 0 else model
                 response = self.client.models.generate_content(
                     model=target_model,
-                    contents=contents if contents else [{"role": "user", "parts": [{"text": "hello"}]}],
+                    contents=contents,
                     config=config if config else None,
                 )
                 return response.text or ""
@@ -178,11 +189,19 @@ class GeminiBackend(BaseBackend):
         """Streaming completion."""
         if self._use_openai_client:
             full_messages = []
-            if system:
-                full_messages.append({"role": "system", "content": system})
+            if system and system.strip():
+                full_messages.append({"role": "system", "content": system.strip()})
             for msg in messages:
-                role = "user" if msg["role"] == "user" else "assistant"
-                full_messages.append({"role": role, "content": msg.get("content", "")})
+                role = "user" if msg.get("role") == "user" else "assistant"
+                content = msg.get("content")
+                if content is not None:
+                    if isinstance(content, str) and content.strip():
+                        full_messages.append({"role": role, "content": content.strip()})
+                    elif not isinstance(content, str):
+                        full_messages.append({"role": role, "content": str(content)})
+            if not full_messages or not any(m.get("content") for m in full_messages if m.get("role") != "system"):
+                full_messages.append({"role": "user", "content": "Hello"})
+
             try:
                 stream_res = self._client.chat.completions.create(
                     model=self.model,
@@ -200,14 +219,19 @@ class GeminiBackend(BaseBackend):
         # Direct Google client path
         contents = []
         for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
-            content = msg.get("content", "")
-            if content:
-                contents.append({"role": role, "parts": [{"text": content}]})
+            role = "user" if msg.get("role") == "user" else "model"
+            content = msg.get("content")
+            if content is not None:
+                content_str = str(content).strip() if isinstance(content, str) else str(content)
+                if content_str:
+                    contents.append({"role": role, "parts": [{"text": content_str}]})
+
+        if not contents:
+            contents = [{"role": "user", "parts": [{"text": "Hello"}]}]
 
         config = {}
-        if system:
-            config["system_instruction"] = system
+        if system and system.strip():
+            config["system_instruction"] = system.strip()
 
         try:
             for chunk in self.client.models.generate_content_stream(
