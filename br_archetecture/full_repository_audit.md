@@ -47,12 +47,19 @@ A complete, end-to-end codebase audit of **BR JARVIS (`Br-Jarvis`)** was conduct
 
 ## 3. Test Execution Summary
 
+The verification pipeline is executed across three independent test runners:
+
 - **Pytest Master Suite**: `python -m pytest tests/`
-  - **Passed**: 58 / 58
+  - **Passed**: 60 / 60 (includes 42 unit and 18 integration tests)
   - **Failed**: 0
   - **Status**: 🟢 100% Green
 
 - **Deep Audit Suite**: `python test_deep_audit.py`
   - **Passed**: 42 / 42
+  - **Failed**: 0
+  - **Status**: 🟢 100% Green
+
+- **Smoke Startup Check**: `python scripts/smoke_startup.py`
+  - **Passed**: 10 / 10
   - **Failed**: 0
   - **Status**: 🟢 100% Green

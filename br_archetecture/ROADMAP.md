@@ -33,7 +33,7 @@ This document outlines the multi-phase implementation roadmap for the BR JARVIS 
 - [x] **Legacy Compatibility Shims** — Root re-export shims for all backends
 - [x] **30 Integration Test Scenarios** (`tests/integration/`) — Vision, operator, files, terminal, memory, stability
 - [x] **CI/CD Pipeline** (`.github/workflows/ci.yml`) — GitHub Actions matrix (Ubuntu/Windows/macOS × Python 3.10–3.12)
-- [x] **58/58 Tests Passing** — Full green across Deep Audit (42), Integration (11), and Smoke (5) test suites
+- [x] **112 Verification Checks Passing** — Full green across the 60 pytest tests (including 18 in `tests/integration/`), 42 standalone checks in `test_deep_audit.py`, and 10 standalone checks in `scripts/smoke_startup.py`
 
 ---
 

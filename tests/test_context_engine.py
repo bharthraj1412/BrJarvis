@@ -52,3 +52,18 @@ def test_context_engine_singleton():
     )
     assert assembled.total_tokens > 0
     assert "Test Goal" in assembled.context_str
+
+
+def test_context_engine_dynamic_profile_budget():
+    engine = get_context_engine()
+    
+    # 1. Call context engine with gemini profile
+    assembled_gemini = engine.assemble_system_context(profile="gemini")
+    
+    # 2. Call context engine with ollama profile
+    assembled_ollama = engine.assemble_system_context(profile="ollama")
+    
+    # 3. Prove that they actually produce different budgets
+    assert assembled_gemini.budget.max_tokens == 1000000
+    assert assembled_ollama.budget.max_tokens == 32000
+    assert assembled_gemini.budget.max_tokens != assembled_ollama.budget.max_tokens

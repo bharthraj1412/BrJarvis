@@ -111,6 +111,8 @@ class SounddeviceMicrophone(_BaseAudioSource):
             except Exception:
                 pass
 
+        self._resample_phase = 0.0
+
     def __enter__(self):
         if not _HAS_SR:
             raise ImportError(
@@ -166,19 +168,23 @@ class SounddeviceMicrophone(_BaseAudioSource):
             return b""
         samples = struct.unpack(f"<{num_samples}h", data_bytes)
         ratio = self.device_sample_rate / self.SAMPLE_RATE
-        out_len = int(num_samples / ratio)
-        if out_len == 0:
-            return b""
-        out_samples = [0] * out_len
-        for i in range(out_len):
-            pos = i * ratio
+        
+        out_samples = []
+        pos = self._resample_phase
+        while pos < num_samples:
             idx = int(pos)
             frac = pos - idx
             if idx + 1 < num_samples:
-                out_samples[i] = int(samples[idx] * (1.0 - frac) + samples[idx + 1] * frac)
+                val = int(samples[idx] * (1.0 - frac) + samples[idx + 1] * frac)
             else:
-                out_samples[i] = samples[idx]
-        return struct.pack(f"<{out_len}h", *out_samples)
+                val = samples[idx]
+            out_samples.append(val)
+            pos += ratio
+            
+        self._resample_phase = pos - num_samples
+        if not out_samples:
+            return b""
+        return struct.pack(f"<{len(out_samples)}h", *out_samples)
 
     def _callback(self, indata, frames, time_info, status):
         raw_bytes = bytes(indata)

@@ -447,12 +447,28 @@ class NeuralTTS:
 
     def _speak_sapi5(self, text: str):
         """Speak using SAPI5 (Windows blocking)."""
-        if not self._sapi_speaker or self._cancel_event.is_set():
+        if self._cancel_event.is_set():
             return
         try:
             if _HAS_PYTHONCOM:
                 pythoncom.CoInitialize()
-            self._sapi_speaker.Speak(text, 0)
+            if self._sapi_speaker:
+                try:
+                    self._sapi_speaker.Speak(text, 0)
+                    return
+                except Exception:
+                    pass
+            # Fallback to local dispatch on current thread if main instance fails
+            import win32com.client
+            local_speaker = win32com.client.Dispatch("SAPI.SpVoice")
+            voices = local_speaker.GetVoices()
+            for i in range(voices.Count):
+                desc = voices.Item(i).GetDescription()
+                if "Zira" in desc or "Hazel" in desc:
+                    local_speaker.Voice = voices.Item(i)
+                    break
+            local_speaker.Rate = -1
+            local_speaker.Speak(text, 0)
         except Exception as e:
             print(f"[JARVIS] SAPI5 speak error: {e}")
 

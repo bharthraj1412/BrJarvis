@@ -5,7 +5,7 @@
 > **Target Platform**: Windows 11 / Linux / macOS  
 > **Last Updated**: 2026-07-23  
 > **Project Scale**: 248 Python source files | 398 total files | 22.49 MB  
-> **Test Coverage**: 42/42 Deep Audit + Integration Tests Passing (0 failures)
+> **Test Coverage**: 112 independent checks passing across 3 suites: 60 pytest (unit+integration) + 42 standalone test_deep_audit.py + 10 standalone scripts/smoke_startup.py (0 failures)
 
 ---
 
@@ -382,17 +382,18 @@ The `DeterministicIntentEngine` in `core/intent_engine.py` (1343 lines) provides
 
 ## 7. Test Coverage Summary
 
-```
-============================================================
-  JARVIS MK37 -- Deep Audit
-============================================================
-  Results: 42 passed, 0 failed
-============================================================
-```
+The verification pipeline is executed across three independent test runners:
 
-| Test Suite | Tests | Status |
+| Test Runner | Command | Checks | Status |
+|---|---|---|---|
+| **Pytest Suite** | `python -m pytest tests/ -v` | **60** | ✅ All PASS (42 unit + 18 integration) |
+| **Deep Audit Suite** | `python test_deep_audit.py` | **42** | ✅ All PASS |
+| **Smoke Startup Check** | `python scripts/smoke_startup.py` | **10** | ✅ All PASS |
+
+### Deep Audit Component Verification Detail:
+
+| Component | Standalone Checks | Status |
 |---|---|---|
-| Deep Audit | 42 | ✅ All PASS |
 | Permissions | 4 | ✅ All PASS |
 | Skill Loader | 7 | ✅ All PASS |
 | Multi-Agent | 4 | ✅ All PASS |

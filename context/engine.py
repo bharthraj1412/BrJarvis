@@ -24,19 +24,32 @@ class ContextEngine:
         self.runtime.container.register_instance(ContextEngine, self)
         logger.info("⚡ ContextEngine initialized")
 
-    def create_builder(self, max_tokens: Optional[int] = None) -> ContextBuilder:
-        """Create a ContextBuilder with optional token budget override."""
-        budget = TokenBudget(max_tokens=max_tokens) if max_tokens else self.default_budget
+    def create_builder(
+        self,
+        max_tokens: Optional[int] = None,
+        profile: Optional[Any] = None
+    ) -> ContextBuilder:
+        """Create a ContextBuilder with optional token budget or profile override."""
+        if profile:
+            profile_str = profile.value if hasattr(profile, "value") else str(profile)
+            budget = TokenBudget.from_profile(profile_str)
+            if max_tokens is not None:
+                budget.max_tokens = max_tokens
+        elif max_tokens is not None:
+            budget = TokenBudget(max_tokens=max_tokens)
+        else:
+            budget = self.default_budget
         return ContextBuilder(budget=budget)
 
     def assemble_system_context(
         self,
         conversation_history: Optional[list] = None,
         active_goal: Optional[str] = None,
-        max_tokens: int = 128000,
+        max_tokens: Optional[int] = None,
+        profile: Optional[Any] = None,
     ) -> AssembledContext:
         """Convenience method to construct full system context payload."""
-        builder = self.create_builder(max_tokens=max_tokens)
+        builder = self.create_builder(max_tokens=max_tokens, profile=profile)
 
         # 1. System Health & Hardware State
         report = self.runtime.health.generate_report()

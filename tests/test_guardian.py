@@ -36,9 +36,19 @@ class TestGuardianSafety(unittest.TestCase):
 
     def test_path_policy_tiers(self):
         """Test PathPolicy file path classification into Tiers 0, 1, and 2."""
-        # Tier 0 Workspace
-        self.assertEqual(PathPolicy.get_tier("d:/BRJARVIS/Br-Jarvis/main.py"), PathTier.TIER_0_WORKSPACE)
-        self.assertTrue(cloud_context_exclusion_check("d:/BRJARVIS/Br-Jarvis/main.py"))
+        # Dynamic Tier 0 Workspace using absolute local paths
+        workspace_root = Path(__file__).resolve().parent.parent
+        workspace_file = workspace_root / "main.py"
+        self.assertEqual(PathPolicy.get_tier(str(workspace_file)), PathTier.TIER_0_WORKSPACE)
+        self.assertTrue(cloud_context_exclusion_check(str(workspace_file)))
+
+        # Tier 1 User Profile (outside workspace)
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        temp_file = Path(temp_dir) / "jarvis_temp_test_file.py"
+        # If temp path is outside workspace, it should fall into Tier 1
+        if not str(temp_file).replace("\\", "/").lower().startswith(str(workspace_root).replace("\\", "/").lower()):
+            self.assertEqual(PathPolicy.get_tier(str(temp_file)), PathTier.TIER_1_USER_PROFILE)
 
         # Tier 2 Critical / Secrets
         self.assertEqual(PathPolicy.get_tier("C:/Windows/System32/config/SAM"), PathTier.TIER_2_CRITICAL_SECRETS)

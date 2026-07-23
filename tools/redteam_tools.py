@@ -142,3 +142,64 @@ def tool_nmap_scan(args: dict) -> str:
 def tool_generate_report(args: dict) -> str:
     from redteam.report import generate_report
     return generate_report(args["data"])
+
+
+@register_tool(
+    name="audit_prompt_security",
+    description="Audit user prompt or screen/web content for injection attacks.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "content": {"type": "string", "description": "Content to inspect for injection vulnerabilities"},
+        },
+        "required": ["content"],
+    }
+)
+def audit_prompt_security(args: dict) -> str:
+    """Audit content for prompt injection indicators (instruction-override phrases, fake roles, etc.)."""
+    content = args.get("content", "")
+    if not isinstance(content, str):
+        return "CLEAN"
+    
+    # 1. Pattern matching common injection override phrases
+    override_keywords = [
+        "ignore previous instructions",
+        "ignore all instructions",
+        "disregard the system prompt",
+        "ignore system prompt",
+        "disregard previous instructions",
+        "you must now ignore",
+        "ignore the above instructions",
+        "ignore instructions above"
+    ]
+    low_content = content.lower()
+    for kw in override_keywords:
+        if kw in low_content:
+            return f"INJECTION DETECTED: Override phrase matched '{kw}'"
+            
+    # 2. Fake role markers inside data
+    fake_role_markers = [
+        "system:",
+        "user:",
+        "assistant:",
+        "### new instructions",
+        "### instruction",
+        "### response"
+    ]
+    for marker in fake_role_markers:
+        if marker in low_content:
+            return f"INJECTION DETECTED: Fake role marker matched '{marker}'"
+
+    # 3. Unicode zero-width characters/suspicious markers
+    suspicious_chars = ["\u200b", "\u200c", "\u200d", "\ufeff"]
+    for sc in suspicious_chars:
+        if sc in content:
+            return "INJECTION DETECTED: Suspicious hidden zero-width character detected"
+
+    # 4. Unusually long base64-looking blocks to hide instruction injections
+    import re
+    base64_pat = re.compile(r'[A-Za-z0-9+/]{80,}=*')
+    if base64_pat.search(content):
+        return "INJECTION DETECTED: Large base64 block detected"
+
+    return "CLEAN"

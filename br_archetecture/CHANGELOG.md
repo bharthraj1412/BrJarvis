@@ -26,6 +26,80 @@ All major architectural updates, subsystem additions, and core refactorings are 
 
 ---
 
+## [37.24.0] — 2026-07-23
+### Added
+- Round 24 voice upgrades: active Git branch 0-token intent trigger variants.
+
+## [37.23.0] — 2026-07-23
+### Added
+- Round 23 voice upgrades: network IP and deep audit test trigger variations.
+
+## [37.22.0] — 2026-07-23
+### Added
+- Round 22 voice upgrades: complex query, chaining, and timezone location guards in intent engine.
+
+## [37.21.0] — 2026-07-23
+### Added
+- Round 21 voice upgrades: swap memory, CPU frequency, system PATH environment, and enhanced file discovery group intent matchers.
+
+## [37.20.0] — 2026-07-23
+### Added
+- Round 20 voice upgrades: CPU Load, Python Modules count, and Disk Partitions telemetry intent matchers.
+
+## [37.19.0] — 2026-07-23
+### Upgraded
+- Memory System Upgrade: added `add_user_message` and `add_assistant_message` helpers to `UnifiedMemoryManager`.
+
+## [37.18.0] — 2026-07-23
+### Added
+- Round 18 voice upgrades: system timezone, markdown files counter, and largest Python source file scanner.
+
+## [37.17.0] — 2026-07-23
+### Added
+- Round 17 voice upgrades: hostname, Python imports counter, and temp directory telemetry.
+
+## [37.16.0] — 2026-07-23
+### Added
+- Round 16 voice upgrades: OS telemetry, Python classes counter, and settings app mappings.
+
+## [37.15.0] — 2026-07-23
+### Added
+- Round 15 voice upgrades: network ping latency diagnostics and Python functions counter.
+
+## [37.14.0] — 2026-07-23
+### Added
+- Round 14 voice upgrades: Git branch, installed Python packages, and clipboard inspection.
+
+## [37.13.0] — 2026-07-23
+### Added
+- Round 13 voice upgrades: disk space, CPU info, active window, and deep audit test runner.
+
+## [37.12.0] — 2026-07-23
+### Added
+- Round 12 voice upgrades: process count, virtualenv status, and environment variables.
+
+## [37.11.0] — 2026-07-23
+### Added
+- Round 11 voice upgrades: display resolution, Python info, and recent commits intent matchers.
+
+## [37.10.0] — 2026-07-23
+### Added
+- Round 10 voice upgrades: battery/power telemetry and workspace Git status.
+
+## [37.9.0] — 2026-07-23
+### Added
+- Round 9 voice upgrades: system uptime and memory store summary.
+
+## [37.8.0] — 2026-07-23
+### Added
+- Round 8 voice upgrades: lock screen, workspace health diagnostics, and project statistics.
+
+## [37.7.0] — 2026-07-23
+### Added
+- Round 7 voice upgrades: Show Desktop, file discovery, and RAM flush.
+
+---
+
 ## [37.6.0] — 2026-07-22
 
 ### Verified & Synchronized — Full Architecture Audit & System Alignment

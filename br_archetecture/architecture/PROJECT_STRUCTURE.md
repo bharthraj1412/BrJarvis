@@ -10,7 +10,7 @@ BrJarvis/
 │   └── audit_log.py             # Autonomy audit log persistence
 │
 ├── evolution/                   # Autonomous Self-Upgrade Engine
-│   ├── classifier.py            # Blast-radius ChangeClassifier (LOW, MEDIUM, HIGH, CRITICAL)
+│   ├── classifier.py            # Blast-radius ChangeClassifier (LOW, MEDIUM, HIGH)
 │   ├── proposer.py              # Automated PatchProposer generator
 │   ├── sandbox.py               # SandboxRunner execution & isolation validator
 │   ├── digest.py                # Architectural ChangeDigest reporter
