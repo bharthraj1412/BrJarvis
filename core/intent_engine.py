@@ -37,6 +37,8 @@ class DeterministicIntentEngine:
         "taskmgr": ["taskmgr", "taskmgr.exe"],
         "task manager": ["taskmgr", "taskmgr.exe"],
         "explorer": ["explorer", "explorer.exe"],
+        "settings": ["ms-settings:"],
+        "control panel": ["control"],
     }
 
     @classmethod
@@ -242,6 +244,21 @@ class DeterministicIntentEngine:
                     "intent": "media_control",
                     "target": "playpause",
                     "result": "Toggled media playback (0-Token Execution).",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        if any(phrase in clean for phrase in ["mute audio", "unmute audio", "mute volume", "unmute volume", "mute", "unmute"]):
+            try:
+                import pyautogui
+                pyautogui.FAILSAFE = False
+                pyautogui.press("volumemute")
+                return {
+                    "executed": True,
+                    "intent": "system_audio",
+                    "target": "volumemute",
+                    "result": "Toggled system audio mute state (0-Token Execution).",
                     "tokens_saved": 1500,
                 }
             except Exception:
@@ -683,6 +700,46 @@ class DeterministicIntentEngine:
                     "intent": "python_functions",
                     "target": "codebase",
                     "result": f"🐍 Python Functions Telemetry:\n• Python Source Files Scanned: {len(py_files)}\n• Total Defined Functions: {func_count:,} functions",
+                    "tokens_saved": 2000,
+                }
+            except Exception:
+                pass
+
+        # 0ai. Match Operating System Info Telemetry Intent
+        if any(phrase in clean for phrase in ["operating system info", "os platform", "os version", "system platform"]):
+            try:
+                import platform
+                os_name = platform.system()
+                os_release = platform.release()
+                os_version = platform.version()
+                os_arch = platform.machine()
+                return {
+                    "executed": True,
+                    "intent": "os_info",
+                    "target": "os_system",
+                    "result": f"🖥️ Operating System Telemetry:\n• OS Platform: {os_name} {os_release} ({os_arch})\n• System Version: {os_version}\n• Architecture: {platform.architecture()[0]}",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0aj. Match Python Classes Counter Intent
+        if any(phrase in clean for phrase in ["count python classes", "search python classes", "list python classes"]):
+            try:
+                py_files = [f for f in Path(".").rglob("*.py") if not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)]
+                class_count = 0
+                for pf in py_files:
+                    try:
+                        for line in pf.read_text(encoding="utf-8", errors="ignore").splitlines():
+                            if line.strip().startswith("class "):
+                                class_count += 1
+                    except Exception:
+                        pass
+                return {
+                    "executed": True,
+                    "intent": "python_classes",
+                    "target": "codebase",
+                    "result": f"🐍 Python Classes Telemetry:\n• Python Source Files Scanned: {len(py_files)}\n• Total Defined Classes: {class_count:,} classes",
                     "tokens_saved": 2000,
                 }
             except Exception:
