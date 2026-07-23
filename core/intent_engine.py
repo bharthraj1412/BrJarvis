@@ -807,6 +807,57 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0an. Match System Timezone Telemetry Intent
+        if any(phrase in clean for phrase in ["check timezone", "system timezone", "timezone", "time zone"]):
+            try:
+                import time
+                from datetime import datetime
+                tz_name = time.tzname[time.daylight] if time.daylight else time.tzname[0]
+                local_now = datetime.now().astimezone()
+                offset = local_now.strftime("%z")
+                return {
+                    "executed": True,
+                    "intent": "timezone_info",
+                    "target": "system_clock",
+                    "result": f"🌐 System Timezone Telemetry:\n• Timezone Identifier: {tz_name}\n• UTC Offset: UTC{offset[:3]}:{offset[3:]}\n• Local Date & Time: {local_now.strftime('%Y-%m-%d %I:%M:%S %p')}",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0ao. Match Markdown Documentation Files Counter Intent
+        if any(phrase in clean for phrase in ["count markdown files", "find markdown files", "list markdown files", "markdown files"]):
+            try:
+                md_files = [f for f in Path(".").rglob("*.md") if not any(p.startswith(".") or p in ["venv", "node_modules"] for p in f.parts)]
+                res_lines = [f"• {f}" for f in md_files[:10]]
+                res_text = "\n".join(res_lines) if res_lines else "No markdown documentation files found."
+                return {
+                    "executed": True,
+                    "intent": "markdown_files",
+                    "target": "documentation",
+                    "result": f"📄 Markdown Documentation Files ({len(md_files)} found):\n{res_text}",
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
+        # 0ap. Match Largest Python Source File Scanner Intent
+        if any(phrase in clean for phrase in ["largest python file", "biggest python file", "largest file"]):
+            try:
+                py_files = [f for f in Path(".").rglob("*.py") if not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)]
+                sorted_files = sorted(py_files, key=lambda f: f.stat().st_size, reverse=True)
+                top_5 = sorted_files[:5]
+                top_lines = [f"• {f} ({round(f.stat().st_size / 1024, 1)} KB | {len(f.read_text(encoding='utf-8', errors='ignore').splitlines()):,} lines)" for f in top_5]
+                return {
+                    "executed": True,
+                    "intent": "largest_file",
+                    "target": "codebase",
+                    "result": f"📊 Largest Python Source Files:\n" + "\n".join(top_lines),
+                    "tokens_saved": 2000,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
