@@ -46,7 +46,7 @@ class HotkeyManager:
     def start(self):
         """Start listening for hotkeys in a background thread."""
         if not _HAS_KEYBOARD:
-            print("[Hotkeys] Warning: 'keyboard' library not installed. Global hotkeys disabled.")
+            print("[Hotkeys] Info: 'keyboard' module not installed. Install with 'pip install keyboard' to enable global background hotkeys.")
             return
 
         self.load_hotkeys()
