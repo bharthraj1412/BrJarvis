@@ -146,6 +146,28 @@ def _call_vision_llm(img_bytes: bytes, system_instruction: str, api_key: str, mo
         raise err
 
 
+def _save_action_visualization(img_bytes: bytes, px_x: int, px_y: int, action: str, step: int) -> None:
+    """Draw click target visualization (red crosshair) and action label for step trace."""
+    try:
+        from PIL import Image, ImageDraw
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        draw = ImageDraw.Draw(img)
+        # Draw red circle around target
+        r = 15
+        draw.ellipse([px_x - r, px_y - r, px_x + r, px_y + r], outline="red", width=3)
+        # Draw crosshair lines
+        draw.line([px_x - 25, px_y, px_x + 25, px_y], fill="red", width=2)
+        draw.line([px_x, px_y - 25, px_x, px_y + 25], fill="red", width=2)
+        # Draw action text label
+        draw.text((px_x + r + 5, px_y - 10), f"Step {step}: {action.upper()}", fill="red")
+        
+        debug_dir = Path("BR_WORKSPACE/Logs/live_os")
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        img.save(debug_dir / f"step_{step}_action.png")
+    except Exception:
+        pass
+
+
 class LiveOSController:
     """Autonomous Live OS Control Loop Engine."""
 
@@ -213,6 +235,15 @@ class LiveOSController:
             is_static = (img_hash == self._last_img_hash)
             self._last_img_hash = img_hash
 
+            # Save step visualization for visual feedback & debugging
+            try:
+                debug_dir = Path("BR_WORKSPACE/Logs/live_os")
+                debug_dir.mkdir(parents=True, exist_ok=True)
+                step_path = debug_dir / f"step_{step}_capture.png"
+                step_path.write_bytes(img_bytes)
+            except Exception:
+                pass
+
             # 2. Prepare visual prompt
             history_summary = ""
             if self.history:
@@ -222,13 +253,23 @@ class LiveOSController:
                     for h in last_few
                 )
 
+            static_warning = ""
+            if is_static and len(self.history) > 0:
+                static_warning = (
+                    "⚠️ WARNING: The screen state has NOT changed since your last action. "
+                    "Your previous action may have missed the element or had no effect. Try double_click, "
+                    "or verify target coordinates, or use a different approach.\n\n"
+                )
+
             system_instruction = (
                 f"You are JARVIS, an autonomous AI operating system controller. "
                 f"Your goal is: '{self.goal}'.\n"
                 f"Current screen resolution: {screen_w} width x {screen_h} height.\n"
                 f"Coordinates scale: 0 to 1000 for x_norm and y_norm (where 0,0 is top-left, 1000,1000 is bottom-right).\n"
+                f"{static_warning}"
                 f"{history_summary}\n\n"
                 f"Analyze the screenshot carefully. Identify open windows, input fields, buttons, icons, or text required to reach the goal.\n"
+                f"Provide target element center point coordinates precisely.\n"
                 f"Respond ONLY with a valid JSON object matching this schema:\n"
                 f"{{\n"
                 f'  "thought": "short explanation of visual analysis and next step",\n'
@@ -266,6 +307,10 @@ class LiveOSController:
                     px_x, px_y = grid_transform(int(x_norm), int(y_norm), screen_w, screen_h)
                 except Exception:
                     px_x, px_y = None, None
+
+            # Visual trace of click target coordinates
+            if px_x is not None and px_y is not None:
+                _save_action_visualization(img_bytes, px_x, px_y, action, step)
 
             print(f"➔ [Step {step}/{self.max_steps}] Thought: {thought}")
             print(f"   Action: '{action}' | Target Coords: ({px_x}, {px_y}) | Input: '{text_val or keys_val}'")
