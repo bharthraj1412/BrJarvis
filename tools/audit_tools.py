@@ -55,10 +55,11 @@ def audit_codebase(args: dict) -> str:
                 syntax_errors.append(f" - {rel_str}:{syn_err.lineno} — {syn_err.msg}")
 
             # 2. Check Unsafe Eval/Exec
-            if re.search(r"\beval\(", content):
-                security_findings.append(f" - {rel_str} → Usage of eval()")
-            if re.search(r"\bexec\(", content):
-                security_findings.append(f" - {rel_str} → Usage of exec()")
+            if not rel_str.endswith("audit_tools.py"):
+                if re.search(r"\beval\s*\(", content):
+                    security_findings.append(f" - {rel_str} → Usage of eval()")
+                if re.search(r"\bexec\s*\(", content):
+                    security_findings.append(f" - {rel_str} → Usage of exec()")
 
             # 3. Check Hardcoded API Keys / Passwords
             if re.search(r"""(?:api[_-]?key|secret|password)\s*=\s*['"][a-zA-Z0-9_\-]{20,}['"]""", content, re.IGNORECASE):
