@@ -102,6 +102,15 @@ class SounddeviceMicrophone(_BaseAudioSource):
         self.stream = None
         self.sd_stream = None
 
+        # Query native sample rate of device
+        self.device_sample_rate = self.SAMPLE_RATE
+        if _HAS_SD and self.device_index is not None:
+            try:
+                device_info = sd.query_devices(self.device_index, 'input')
+                self.device_sample_rate = int(device_info.get('default_samplerate', self.SAMPLE_RATE))
+            except Exception:
+                pass
+
     def __enter__(self):
         if not _HAS_SR:
             raise ImportError(
@@ -112,14 +121,30 @@ class SounddeviceMicrophone(_BaseAudioSource):
                 "sounddevice is not installed. Run 'pip install sounddevice' to use voice features."
             )
             
-        self.sd_stream = sd.RawInputStream(
-            samplerate=self.SAMPLE_RATE,
-            blocksize=self.CHUNK,
-            device=self.device_index,
-            channels=1,
-            dtype='int16',
-            callback=self._callback
-        )
+        # Try opening raw input stream with dynamic fallback samplerates
+        rates_to_try = [self.device_sample_rate, 16000, 44100, 48000, 32000, 8000]
+        rates_to_try = list(dict.fromkeys([int(r) for r in rates_to_try if r is not None]))
+        
+        last_err = None
+        for rate in rates_to_try:
+            try:
+                self.sd_stream = sd.RawInputStream(
+                    samplerate=rate,
+                    blocksize=self.CHUNK,
+                    device=self.device_index,
+                    channels=1,
+                    dtype='int16',
+                    callback=self._callback
+                )
+                self.device_sample_rate = rate
+                break
+            except Exception as e:
+                last_err = e
+                self.sd_stream = None
+                
+        if self.sd_stream is None:
+            raise RuntimeError(f"Failed to open audio input stream: {last_err}")
+
         self.sd_stream.start()
         self.stream = self
         return self
@@ -134,8 +159,35 @@ class SounddeviceMicrophone(_BaseAudioSource):
             self.sd_stream = None
         self.stream = None
 
+    def _resample(self, data_bytes: bytes) -> bytes:
+        import struct
+        num_samples = len(data_bytes) // 2
+        if num_samples == 0:
+            return b""
+        samples = struct.unpack(f"<{num_samples}h", data_bytes)
+        ratio = self.device_sample_rate / self.SAMPLE_RATE
+        out_len = int(num_samples / ratio)
+        if out_len == 0:
+            return b""
+        out_samples = [0] * out_len
+        for i in range(out_len):
+            pos = i * ratio
+            idx = int(pos)
+            frac = pos - idx
+            if idx + 1 < num_samples:
+                out_samples[i] = int(samples[idx] * (1.0 - frac) + samples[idx + 1] * frac)
+            else:
+                out_samples[i] = samples[idx]
+        return struct.pack(f"<{out_len}h", *out_samples)
+
     def _callback(self, indata, frames, time_info, status):
-        self.q.put(bytes(indata))
+        raw_bytes = bytes(indata)
+        if self.device_sample_rate != self.SAMPLE_RATE:
+            try:
+                raw_bytes = self._resample(raw_bytes)
+            except Exception:
+                pass
+        self.q.put(raw_bytes)
 
     def read(self, size):
         bytes_to_read = size * self.SAMPLE_WIDTH

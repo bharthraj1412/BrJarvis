@@ -250,6 +250,15 @@ class NeuralTTS:
         self._generation_id = 0                  # monotonic generation counter for task isolation
         self._gen_lock = threading.Lock()         # thread lock for generation ID
         self._prune_cache()
+        self._init_fallback_speaker()
+
+    def _init_fallback_speaker(self):
+        """Always initialize local fallback speaker for robust runtime recovery."""
+        self._sapi_speaker = None
+        if _OS == "Windows":
+            self._init_sapi5()
+        else:
+            self._init_linux_tts()
 
     def _prune_cache(self, max_files: int = 500, max_bytes: int = 200 * 1024 * 1024):
         """Prune TTS cache directory if it exceeds max files or total byte limit."""
@@ -265,14 +274,6 @@ class NeuralTTS:
                     pass
         except Exception:
             pass
-
-        # Fallback speaker
-        self._sapi_speaker = None
-        if not _HAS_EDGE_TTS:
-            if _OS == "Windows":
-                self._init_sapi5()
-            else:
-                self._init_linux_tts()
 
     def _init_sapi5(self):
         """Initialize SAPI5 as fallback (Windows)."""
