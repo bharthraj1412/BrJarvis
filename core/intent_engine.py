@@ -232,7 +232,7 @@ class DeterministicIntentEngine:
                 pass
 
         # 0i. Match Media & Volume Controls
-        if any(phrase in clean for phrase in ["play music", "pause music", "resume music", "toggle playback", "play media", "pause media", "play", "pause"]):
+        if any(re.search(rf"\b{re.escape(phrase)}\b", clean) for phrase in ["play music", "pause music", "resume music", "toggle playback", "play media", "pause media", "play", "pause"]):
             try:
                 import pyautogui
                 pyautogui.FAILSAFE = False
@@ -242,6 +242,21 @@ class DeterministicIntentEngine:
                     "intent": "media_control",
                     "target": "playpause",
                     "result": "Toggled media playback (0-Token Execution).",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0t. Match Display Resolution Telemetry Intent
+        if any(phrase in clean for phrase in ["check display resolution", "display resolution", "screen resolution", "display geometry"]):
+            try:
+                import pyautogui
+                width, height = pyautogui.size()
+                return {
+                    "executed": True,
+                    "intent": "display_resolution",
+                    "target": "display_sensor",
+                    "result": f"🖥️ Display Resolution Telemetry:\n• Main Screen Resolution: {width} x {height} pixels\n• Orientation: Landscape",
                     "tokens_saved": 1500,
                 }
             except Exception:
@@ -423,6 +438,35 @@ class DeterministicIntentEngine:
                     "intent": "git_status",
                     "target": "git_repo",
                     "result": status_msg,
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
+        # 0u. Match Python Environment Telemetry Intent
+        if any(phrase in clean for phrase in ["check python version", "python version", "python info", "python environment"]):
+            try:
+                ver = sys.version.splitlines()[0]
+                return {
+                    "executed": True,
+                    "intent": "python_info",
+                    "target": "python_runtime",
+                    "result": f"🐍 Python Runtime Environment:\n• Python Version: {ver}\n• Executable Path: {sys.executable}\n• Platform: {sys.platform}",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0v. Match Recent Git Commit History Intent
+        if any(phrase in clean for phrase in ["recent commits", "git log", "commit history", "recent git commits"]):
+            try:
+                out = subprocess.check_output(["git", "log", "-n", "5", "--oneline"], text=True, timeout=3.0).strip()
+                res_lines = [f"• {line}" for line in out.splitlines()] if out else ["No commit history found."]
+                return {
+                    "executed": True,
+                    "intent": "git_log",
+                    "target": "git_repo",
+                    "result": f"📜 Recent Git Commit History (Last 5 Commits):\n" + "\n".join(res_lines),
                     "tokens_saved": 1800,
                 }
             except Exception:
