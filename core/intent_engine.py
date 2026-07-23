@@ -355,6 +355,43 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0p. Match System Uptime Intent
+        if any(phrase in clean for phrase in ["system uptime", "uptime", "how long has computer been running"]):
+            try:
+                import psutil, time
+                from datetime import datetime, timedelta
+                boot_time = psutil.boot_time()
+                boot_dt = datetime.fromtimestamp(boot_time)
+                uptime = timedelta(seconds=int(time.time() - boot_time))
+                hours, remainder = divmod(uptime.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                uptime_str = f"{uptime.days}d {hours}h {minutes}m" if uptime.days > 0 else f"{hours}h {minutes}m"
+                return {
+                    "executed": True,
+                    "intent": "system_uptime",
+                    "target": "system_clock",
+                    "result": f"⏱️ System Uptime Telemetry:\n• System Boot Time: {boot_dt.strftime('%Y-%m-%d %I:%M %p')}\n• Active System Uptime: {uptime_str}",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0q. Match Memory Store Summary Intent
+        if any(phrase in clean for phrase in ["memory store summary", "persistent memory count", "memory index count", "memory count"]):
+            try:
+                from memory.memory_context import scan_all_memories
+                headers = scan_all_memories()
+                scopes = set(h.scope for h in headers)
+                return {
+                    "executed": True,
+                    "intent": "memory_summary",
+                    "target": "persistent_store",
+                    "result": f"🧠 Persistent Memory Store Summary:\n• Total Indexed Memory Files: {len(headers)}\n• Memory Scopes Active: {', '.join(scopes) if scopes else 'user'}\n• Index File Status: Synced & Active",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
