@@ -745,6 +745,68 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0ak. Match Hostname & Computer Name Intent
+        if any(phrase in clean for phrase in ["check hostname", "hostname", "computer name", "device name"]):
+            try:
+                import socket, platform
+                host = socket.gethostname()
+                node = platform.node()
+                return {
+                    "executed": True,
+                    "intent": "hostname_info",
+                    "target": "system_ident",
+                    "result": f"💻 Computer Identification Telemetry:\n• Hostname: {host}\n• Network Node: {node}",
+                    "tokens_saved": 1200,
+                }
+            except Exception:
+                pass
+
+        # 0al. Match Python Imports Counter Intent
+        if any(phrase in clean for phrase in ["count python imports", "search python imports", "list python imports"]):
+            try:
+                py_files = [f for f in Path(".").rglob("*.py") if not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)]
+                import_count = 0
+                for pf in py_files:
+                    try:
+                        for line in pf.read_text(encoding="utf-8", errors="ignore").splitlines():
+                            l = line.strip()
+                            if l.startswith("import ") or l.startswith("from "):
+                                import_count += 1
+                    except Exception:
+                        pass
+                return {
+                    "executed": True,
+                    "intent": "python_imports",
+                    "target": "codebase",
+                    "result": f"🐍 Python Imports Telemetry:\n• Python Source Files Scanned: {len(py_files)}\n• Total Imported Statements: {import_count:,} import statements",
+                    "tokens_saved": 2000,
+                }
+            except Exception:
+                pass
+
+        # 0am. Match Temporary Directory Telemetry Intent
+        if any(phrase in clean for phrase in ["check temp directory", "temp files size", "temp folder size"]):
+            try:
+                import tempfile
+                temp_dir = Path(tempfile.gettempdir())
+                temp_files = [f for f in temp_dir.rglob("*") if f.is_file()]
+                total_bytes = 0
+                for f in temp_files:
+                    try:
+                        total_bytes += f.stat().st_size
+                    except Exception:
+                        pass
+                mb_size = round(total_bytes / (1024 * 1024), 2)
+                return {
+                    "executed": True,
+                    "intent": "temp_dir_info",
+                    "target": "temp_storage",
+                    "result": f"🧹 Temporary Storage Telemetry:\n• Temp Folder Path: {temp_dir}\n• Total Temp Files: {len(temp_files):,} files\n• Storage Occupied: {mb_size} MB",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
