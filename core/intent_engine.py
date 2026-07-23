@@ -300,16 +300,28 @@ class DeterministicIntentEngine:
         if file_disc_match:
             try:
                 ext = file_disc_match.group(1).lower()
-                ext_str = f".{ext}" if not ext.startswith(".") else ext
-                matched_files = list(Path(".").rglob(f"*{ext_str}"))
+                matched_files = []
+                if ext in ("script", "scripts"):
+                    for e in [".py", ".bat", ".ps1", ".sh"]:
+                        matched_files.extend(list(Path(".").rglob(f"*{e}")))
+                    ext_label = "Script"
+                elif ext in ("code", "source"):
+                    for e in [".py", ".c", ".cpp", ".h", ".java", ".go", ".rs"]:
+                        matched_files.extend(list(Path(".").rglob(f"*{e}")))
+                    ext_label = "Source Code"
+                else:
+                    ext_str = f".{ext}" if not ext.startswith(".") else ext
+                    matched_files = list(Path(".").rglob(f"*{ext_str}"))
+                    ext_label = ext.upper()
+
                 matched_files = [f for f in matched_files if not any(part.startswith(".") or part in ["venv", "__pycache__", "node_modules"] for part in f.parts)]
                 res_lines = [f"• {f}" for f in matched_files[:10]]
-                res_text = "\n".join(res_lines) if res_lines else f"No {ext.upper()} files found in workspace."
+                res_text = "\n".join(res_lines) if res_lines else f"No {ext_label} files found in workspace."
                 return {
                     "executed": True,
                     "intent": "file_discovery",
-                    "target": ext_str,
-                    "result": f"📁 Workspace {ext.upper()} Files ({len(matched_files)} found):\n{res_text}",
+                    "target": ext,
+                    "result": f"📁 Workspace {ext_label} Files ({len(matched_files)} found):\n{res_text}",
                     "tokens_saved": 1800,
                 }
             except Exception:
@@ -906,6 +918,61 @@ class DeterministicIntentEngine:
                     "intent": "disk_partitions",
                     "target": "disk_drive",
                     "result": f"💾 Disk Partitions Telemetry:\n" + "\n".join(part_lines),
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
+        # 0at. Match Swap Memory Telemetry Intent
+        if any(phrase in clean for phrase in ["check swap memory", "swap memory", "swap usage"]):
+            try:
+                import psutil
+                swap = psutil.swap_memory()
+                total_gb = round(swap.total / (1024**3), 2)
+                used_gb = round(swap.used / (1024**3), 2)
+                free_gb = round(swap.free / (1024**3), 2)
+                return {
+                    "executed": True,
+                    "intent": "swap_memory",
+                    "target": "memory_processes",
+                    "result": f"🧹 Swap Memory Telemetry:\n• Total Swap Space: {total_gb} GB\n• Used Swap Space: {used_gb} GB\n• Free Swap Space: {free_gb} GB ({swap.percent}% utilized)",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0au. Match CPU frequency Telemetry Intent
+        if any(phrase in clean for phrase in ["get cpu frequency", "cpu frequency", "cpu speed", "processor speed"]):
+            try:
+                import psutil
+                freq = psutil.cpu_freq()
+                if freq:
+                    res_text = f"💻 CPU Clock Speed Telemetry:\n• Current Speed: {freq.current} MHz\n• Min Speed: {freq.min} MHz | Max Speed: {freq.max} MHz"
+                else:
+                    res_text = "💻 CPU Clock Speed Telemetry: Not available (virtualized environment)."
+                return {
+                    "executed": True,
+                    "intent": "cpu_frequency",
+                    "target": "processor",
+                    "result": res_text,
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0av. Match Path Environment Telemetry Intent
+        if any(phrase in clean for phrase in ["check path environment", "path environment", "system path"]):
+            try:
+                import os
+                sys_path = os.environ.get("PATH", "")
+                parts = sys_path.split(os.pathsep)
+                lines = [f"• {p}" for p in parts[:10] if p]
+                suffix = f"\n• ... and {len(parts) - 10} more paths" if len(parts) > 10 else ""
+                return {
+                    "executed": True,
+                    "intent": "path_env",
+                    "target": "os_environment",
+                    "result": f"🔑 System Environment PATH (First 10 entries):\n" + "\n".join(lines) + suffix,
                     "tokens_saved": 1800,
                 }
             except Exception:
