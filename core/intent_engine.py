@@ -87,6 +87,72 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0c. Match System Cleanup Intent
+        if any(phrase in clean for phrase in ["clear system cache", "clean temporary files", "clean temp files", "free disk space", "clear cache"]):
+            try:
+                from actions.system_cleanup import execute_system_cleanup
+                clean_msg = execute_system_cleanup(clean_temp=True, clean_pycache=True)
+                return {
+                    "executed": True,
+                    "intent": "system_cleanup",
+                    "target": "cache_and_temp",
+                    "result": clean_msg,
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
+        # 0d. Match Process Memory Optimizer Intent
+        if any(phrase in clean for phrase in ["find memory hogs", "top memory processes", "high memory processes", "process optimization", "memory hog"]):
+            try:
+                from actions.process_optimizer import run_process_optimization
+                opt_msg = run_process_optimization(threshold_mb=400.0)
+                return {
+                    "executed": True,
+                    "intent": "process_optimization",
+                    "target": "memory_processes",
+                    "result": opt_msg,
+                    "tokens_saved": 1800,
+                }
+            except Exception:
+                pass
+
+        # 0e. Match Persistent Memory Save & Recall Intent
+        if clean.startswith("remember ") or "remember that " in clean:
+            try:
+                from memory.persistent_store import save_memory, MemoryEntry
+                fact = re.sub(r"^(?:remember that|remember)\s+", "", clean, flags=re.IGNORECASE).strip()
+                if fact:
+                    slug = re.sub(r"[^\w]+", "_", fact[:30]).strip("_")
+                    entry = MemoryEntry(name=f"fact_{slug}", description=fact[:60], type="preference", content=fact)
+                    save_memory(entry)
+                    return {
+                        "executed": True,
+                        "intent": "memory_save",
+                        "target": "persistent_store",
+                        "result": f"Saved fact to persistent memory: '{fact}'",
+                        "tokens_saved": 1500,
+                    }
+            except Exception as e:
+                pass
+
+        if any(clean.startswith(prefix) or prefix in clean for prefix in ["recall ", "search memory for ", "what do you remember"]):
+            try:
+                from memory.memory_context import find_relevant_memories
+                query = re.sub(r"^(?:recall|search memory for|what do you remember about|what do you remember)\s*", "", clean, flags=re.IGNORECASE).strip()
+                if query:
+                    mems = find_relevant_memories(query)
+                    res_str = "\n".join([f"• {m}" for m in mems[:5]]) if mems else "No matching memories found."
+                    return {
+                        "executed": True,
+                        "intent": "memory_recall",
+                        "target": "persistent_store",
+                        "result": f"Recalled Memories for '{query}':\n{res_str}",
+                        "tokens_saved": 1500,
+                    }
+            except Exception as e:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
@@ -188,8 +254,8 @@ class DeterministicIntentEngine:
             "b.r.jarvis", "jarvis product", "jarvis analysis",
             "jarvis report", "project product",
         ])
-        exact_commands = ("create pdf open it", "open pdf", "product analysis", "create pdf")
-        if (has_doc_type and has_jarvis_product and not has_data_request) or clean in exact_commands:
+        exact_commands = ("create pdf open it", "open pdf", "product analysis", "create pdf", "create product analysis report", "generate product analysis", "product report")
+        if (has_jarvis_product and not has_data_request) or clean in exact_commands:
             try:
                 from tools.doc_tools import generate_project_product_analysis
                 res_msg = generate_project_product_analysis({})
