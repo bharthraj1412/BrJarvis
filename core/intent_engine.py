@@ -644,6 +644,50 @@ class DeterministicIntentEngine:
             except Exception:
                 pass
 
+        # 0ag. Match Network Ping Telemetry Intent
+        if any(phrase in clean for phrase in ["ping check", "check ping", "network ping", "ping google"]):
+            try:
+                import time, socket
+                host = "8.8.8.8"
+                start = time.time()
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2.0)
+                result = sock.connect_ex((host, 53))
+                latency = round((time.time() - start) * 1000, 1)
+                sock.close()
+                ping_str = f"{latency} ms" if result == 0 else "Connection timed out"
+                return {
+                    "executed": True,
+                    "intent": "network_ping",
+                    "target": "network_interface",
+                    "result": f"📡 Network Latency Diagnostic:\n• Target Host: {host} (DNS Server)\n• Round-Trip Latency: {ping_str}\n• Connection Quality: {'Excellent (<50ms)' if latency < 50 else 'Normal'}",
+                    "tokens_saved": 1500,
+                }
+            except Exception:
+                pass
+
+        # 0ah. Match Python Functions Counter Intent
+        if any(phrase in clean for phrase in ["search python functions", "list python functions", "count python functions"]):
+            try:
+                py_files = [f for f in Path(".").rglob("*.py") if not any(p.startswith(".") or p in ["venv", "__pycache__"] for p in f.parts)]
+                func_count = 0
+                for pf in py_files:
+                    try:
+                        for line in pf.read_text(encoding="utf-8", errors="ignore").splitlines():
+                            if line.strip().startswith("def "):
+                                func_count += 1
+                    except Exception:
+                        pass
+                return {
+                    "executed": True,
+                    "intent": "python_functions",
+                    "target": "codebase",
+                    "result": f"🐍 Python Functions Telemetry:\n• Python Source Files Scanned: {len(py_files)}\n• Total Defined Functions: {func_count:,} functions",
+                    "tokens_saved": 2000,
+                }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
