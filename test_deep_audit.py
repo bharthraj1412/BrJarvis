@@ -444,29 +444,21 @@ test("Skill executor inline mode", t_skill_executor_inline)
 
 def t_full_syntax_check():
     import py_compile
-    py_compile.compile("main_mk37.py", doraise=True)
-    py_compile.compile("orchestrator.py", doraise=True)
-    py_compile.compile("router.py", doraise=True)
-    py_compile.compile("permissions.py", doraise=True)
+    for fpath in ["start.py", "server.py", "ui.py", "orchestrator.py", "router.py", "permissions.py"]:
+        py_compile.compile(fpath, doraise=True)
 test("Key files syntax-valid", t_full_syntax_check)
 
 def t_backend_complete_signature():
     """Verify all backends have the correct complete(messages, system) signature."""
     import inspect
-    for mod_name, cls_name in [
-        ("anthropic_backend", "ClaudeBackend"),
-        ("openai_backend", "OpenAIBackend"),
-        ("gemini_backend", "GeminiBackend"),
-        ("ollama_backend", "OllamaBackend"),
-        ("nvidia_backend", "NvidiaBackend"),
-        ("mistral_backend", "MistralBackend"),
-    ]:
-        mod = __import__(mod_name)
-        cls = getattr(mod, cls_name)
+    from backends.gemini import GeminiBackend
+    from backends.openai_compat import OpenAIBackend
+
+    for cls in [GeminiBackend, OpenAIBackend]:
         sig = inspect.signature(cls.complete)
         params = list(sig.parameters.keys())
-        assert "messages" in params, f"{cls_name}.complete missing 'messages' param"
-        assert "system" in params, f"{cls_name}.complete missing 'system' param"
+        assert "messages" in params, f"{cls.__name__}.complete missing 'messages' param"
+        assert "system" in params, f"{cls.__name__}.complete missing 'system' param"
 test("All backends have complete(messages, system)", t_backend_complete_signature)
 
 def t_redteam_scope_enforcer():

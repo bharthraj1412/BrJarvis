@@ -348,7 +348,7 @@ class GeminiBackend(BaseBackend):
         """Quick single-prompt completion — for planning, routing, etc."""
         return self.complete([{"role": "user", "content": prompt}])
 
-    def ping(self, timeout: float = 3.0) -> bool:
+    def ping(self, timeout: float = 10.0) -> bool:
         """Health check via completion to leverage fallback model chain."""
         try:
             start = time.monotonic()

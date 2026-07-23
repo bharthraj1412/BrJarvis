@@ -8,27 +8,20 @@ def weather_action(
     player=None,
     session_memory=None,
 ) -> str:
-    city     = parameters.get("city")
-    when     = parameters.get("time", "today")  
-
-    if not city or not isinstance(city, str) or not city.strip():
-        msg = "Sir, the city is missing for the weather report."
-        _log(msg, player)
-        return msg
-
-    city = city.strip()
-    when = (when or "today").strip()
+    city     = (parameters.get("city") or "").strip()
+    when     = (parameters.get("time") or "today").strip()
 
     # ── Try to fetch real weather data from wttr.in (JSON) ────────────────
     weather_text = _fetch_weather_data(city)
 
     if weather_text:
-        # Also open browser for visual display
-        url = f"https://www.google.com/search?q={quote_plus(f'weather in {city} {when}')}"
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+        # Also open browser for visual display if city specified
+        if city:
+            url = f"https://www.google.com/search?q={quote_plus(f'weather in {city} {when}')}"
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
 
         _log(weather_text, player)
 

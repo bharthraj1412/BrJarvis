@@ -49,6 +49,28 @@ class DeterministicIntentEngine:
         clean = text.lower().strip().rstrip(".!;")
         lines = [line.strip().lower() for line in text.splitlines() if line.strip()]
 
+        # 0. Match Weather Intent (e.g., "what is the weather today", "weather in London", "temperature today")
+        if any(w in clean for w in ["weather", "temperature"]):
+            try:
+                from actions.weather_report import weather_action
+                city_match = re.search(r"weather\s+(?:in|for|at)\s+([a-z\s]+)", clean)
+                city = ""
+                if city_match:
+                    city = city_match.group(1).strip()
+                    for word in ["today", "now", "tomorrow", "this week"]:
+                        city = city.replace(word, "").strip()
+                res_msg = weather_action({"city": city, "time": "today"})
+                if res_msg:
+                    return {
+                        "executed": True,
+                        "intent": "weather_report",
+                        "target": city or "local",
+                        "result": res_msg,
+                        "tokens_saved": 1500,
+                    }
+            except Exception:
+                pass
+
         # Do NOT intercept complex prompts containing pipelines, custom filenames, or multi-step requests
         if any(marker in clean for marker in ["|", "named ", "content:", "then ", "create a pdf", "create a word", "save to"]):
             return None
