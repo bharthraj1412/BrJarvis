@@ -211,7 +211,7 @@ class DeterministicIntentEngine:
                 pass
 
         # 0g. Match Network Telemetry Intent
-        if any(phrase in clean for phrase in ["get network status", "check ip address", "network status", "my ip address", "ip address"]):
+        if any(phrase in clean for phrase in ["get network status", "check ip address", "network status", "my ip address", "ip address", "show current ip", "what is my ip", "show ip", "current ip"]):
             try:
                 import socket, urllib.request, json
                 hostname = socket.gethostname()
@@ -626,7 +626,7 @@ class DeterministicIntentEngine:
                 pass
 
         # 0ac. Match Automated Deep Audit Test Suite Intent
-        if any(phrase in clean for phrase in ["run deep audit", "run test suite", "system audit test"]):
+        if any(phrase in clean for phrase in ["run deep audit", "run test suite", "system audit test", "run automated deep audit", "run automated audit", "deep audit", "run audit"]):
             try:
                 out = subprocess.check_output([sys.executable, "test_deep_audit.py"], encoding="utf-8", errors="replace", timeout=15.0)
                 pass_line = [l for l in out.splitlines() if "passed" in l or "Results:" in l]
