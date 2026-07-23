@@ -124,8 +124,27 @@ class DeterministicIntentEngine:
                     "result": f"Successfully opened {target_url} in default browser (0-Token Execution).",
                     "tokens_saved": 1800,
                 }
-            except Exception as e:
+            except Exception:
                 pass
+
+        # 2b. Match Web Search Intent (e.g., "search web for python 3.14", "google search python 3.14")
+        search_match = re.search(r"^(?:search web for|google search|search web|google)\s+(.+)$", clean)
+        if search_match:
+            query = search_match.group(1).strip()
+            if query and not any(w in query for w in ["file", "codebase", "memory", "history", "workspace"]):
+                from urllib.parse import quote_plus
+                target_url = f"https://www.google.com/search?q={quote_plus(query)}"
+                try:
+                    webbrowser.open(target_url)
+                    return {
+                        "executed": True,
+                        "intent": "web_search",
+                        "target": query,
+                        "result": f"Opened Google web search for '{query}' in default browser (0-Token Execution).",
+                        "tokens_saved": 1800,
+                    }
+                except Exception:
+                    pass
 
         # 3. Match Excel Codebase Analysis Intent — STRICT: only for JARVIS project analysis
         #    Must explicitly mention the codebase/project analysis, NOT generic "report in excel"
