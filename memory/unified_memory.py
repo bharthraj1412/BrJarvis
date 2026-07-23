@@ -54,6 +54,14 @@ class UnifiedMemoryManager:
         """Retrieve active conversation history."""
         return self.working.get()
 
+    def add_user_message(self, content: str) -> None:
+        """Add user message to active working memory."""
+        self.add_interaction("user", content)
+
+    def add_assistant_message(self, content: str) -> None:
+        """Add assistant message to active working memory."""
+        self.add_interaction("assistant", content)
+
     # ── Tier 2: Persistent & Semantic Vector Memory ──────────────────────
 
     def remember(
