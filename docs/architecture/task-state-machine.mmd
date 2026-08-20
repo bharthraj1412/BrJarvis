@@ -1,0 +1,40 @@
+stateDiagram-v2
+    [*] --> CREATED
+    CREATED --> UNDERSTANDING: request accepted
+    UNDERSTANDING --> PLANNING: intent and constraints resolved
+    PLANNING --> PREFLIGHT: plan and criteria created
+    PREFLIGHT --> WAITING_APPROVAL: high-risk action detected
+    PREFLIGHT --> RUNNING: no approval required
+    WAITING_APPROVAL --> RUNNING: user approves
+    WAITING_APPROVAL --> CANCELLED: user rejects or timeout
+    RUNNING --> RUNNING: execute next step
+    RUNNING --> PAUSED: user/system pause
+    PAUSED --> RUNNING: resume from checkpoint
+    RUNNING --> RECOVERING: crash, timeout, or watchdog intervention
+    RECOVERING --> PAUSED: checkpoint available
+    RECOVERING --> FAILED: no safe checkpoint or recovery exhausted
+    RUNNING --> VERIFYING: candidate result produced
+    VERIFYING --> VERIFIED: post-conditions and evidence pass
+    VERIFYING --> RECOVERING: verification failure with retry path
+    VERIFYING --> PARTIAL: some criteria met, remainder unresolved
+    RUNNING --> FAILED: unrecoverable execution error
+    RUNNING --> CANCELLED: cancellation requested
+    VERIFIED --> COMPLETED: final response persisted
+    PARTIAL --> COMPLETED: partial result explicitly reported
+    FAILED --> [*]
+    CANCELLED --> [*]
+    COMPLETED --> [*]
+
+    note right of PREFLIGHT
+      TaskStateManager persists
+      immutable goal, criteria,
+      actions, approvals, and
+      checkpoint metadata.
+    end note
+
+    note right of VERIFYING
+      Evidence is retained with
+      task events and artifacts;
+      success is not inferred from
+      model text alone.
+    end note

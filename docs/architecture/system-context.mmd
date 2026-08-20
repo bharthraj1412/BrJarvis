@@ -1,0 +1,58 @@
+flowchart LR
+    USER[User]
+    CLI[CLI / start.py]
+    WEB[FastAPI + packaged PWA]
+    DESKTOP[Qt voice UI + floating widget]
+    CAREER[Career OS]
+    REMOTE[Mobile / Telegram adapters]
+
+    RUNTIME[AssistantRuntime\ncore bootstrap singleton]
+    ROUTER[AgentRouter\nprovider selection]
+    ORCH[JarvisOrchestrator\nReAct + tool loop]
+    TOOLS[Tool Registry\nschemas + connector tools]
+    POLICY[Security Policy\ncapabilities + approvals]
+    VERIFY[Verification + evidence]
+    MEMORY[Unified Memory\nSQLite + vector + working memory]
+    TASKS[Task State + Queue\nSQLite + checkpoints]
+    EVENTS[EventBus + JSONL store]
+    ARTIFACTS[Contained workspace + artifacts]
+    PROVIDERS[Gemini / OpenAI-compatible\nAnthropic / Mistral / Ollama]
+    OS[Local OS\nfiles, browser, audio, desktop]
+
+    USER --> CLI
+    USER --> WEB
+    USER --> DESKTOP
+    USER --> CAREER
+    USER --> REMOTE
+    CLI --> RUNTIME
+    WEB --> RUNTIME
+    DESKTOP --> RUNTIME
+    CAREER --> RUNTIME
+    REMOTE --> RUNTIME
+    RUNTIME --> ROUTER
+    RUNTIME --> ORCH
+    RUNTIME --> EVENTS
+    ORCH --> PROVIDERS
+    ORCH --> TOOLS
+    TOOLS --> POLICY
+    POLICY -->|approval when required| TOOLS
+    TOOLS --> OS
+    TOOLS --> ARTIFACTS
+    ORCH --> MEMORY
+    ORCH --> TASKS
+    TASKS --> EVENTS
+    TOOLS --> VERIFY
+    VERIFY --> TASKS
+    VERIFY --> EVENTS
+    MEMORY --> EVENTS
+
+    classDef surface fill:#eaf2ff,stroke:#2b6cb0,color:#17365d;
+    classDef runtime fill:#e6ffed,stroke:#238636,color:#164b27;
+    classDef control fill:#fff5cc,stroke:#b7791f,color:#5f370e;
+    classDef data fill:#f3e8ff,stroke:#7c3aed,color:#3b1d70;
+    classDef external fill:#ffe8e8,stroke:#c53030,color:#641b1b;
+    class CLI,WEB,DESKTOP,CAREER,REMOTE surface;
+    class RUNTIME,ROUTER,ORCH runtime;
+    class TOOLS,POLICY,VERIFY control;
+    class MEMORY,TASKS,EVENTS,ARTIFACTS data;
+    class PROVIDERS,OS external;

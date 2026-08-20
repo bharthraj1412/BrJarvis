@@ -1,0 +1,47 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant Surface as CLI / Web / Voice / Widget
+    participant Runtime as AssistantRuntime
+    participant Orch as JarvisOrchestrator
+    participant Memory as Unified Memory
+    participant Router as AgentRouter
+    participant Model as Selected LLM backend
+    participant Registry as Tool Registry
+    participant Policy as Policy + approval gate
+    participant Tool as Tool / connector adapter
+    participant Verify as Verifier
+    participant State as TaskStateManager
+    participant Events as EventBus + event store
+
+    User->>Surface: Submit goal or transcript
+    Surface->>Runtime: Resolve shared singleton runtime
+    Runtime->>Orch: Route request to canonical orchestrator
+    Orch->>Memory: Recall relevant context and prior experience
+    Orch->>Router: Select backend for task profile
+    Router-->>Orch: Backend and routing decision
+    Orch->>Model: Send prompt, memory context, and tool contract
+    Model-->>Orch: Answer or structured tool call
+    alt Tool call required
+        Orch->>Registry: Parse and resolve tool
+        Registry->>Policy: Evaluate capability, risk, paths, and approval
+        alt Approval required
+            Policy-->>Surface: Request explicit approval
+            User-->>Surface: Approve or reject
+            Surface-->>Policy: Approval decision
+        end
+        Policy->>Tool: Dispatch permitted action
+        Tool-->>Registry: Result, artifacts, or error
+        Registry-->>Orch: Tool execution record
+        Orch->>Verify: Check post-conditions and evidence
+        Verify->>State: Persist outcome, checkpoint, and evidence
+        Verify->>Events: Publish task and evidence events
+        Orch->>Model: Continue with verified result
+        Model-->>Orch: Final response or next tool call
+    else Direct response
+        Model-->>Orch: Final response
+    end
+    Orch->>State: Persist final task/session outcome
+    Orch->>Events: Publish completion or failure event
+    Orch-->>Surface: Evidence-backed response and task status
+    Surface-->>User: Render result, history, and available continuation
