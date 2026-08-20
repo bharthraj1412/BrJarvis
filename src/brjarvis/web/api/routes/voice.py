@@ -16,7 +16,45 @@ class VoiceTTSRequest(BaseModel):
     voice: Optional[str] = "en-US-ChristopherNeural"
 
 
+class VoiceRefineRequest(BaseModel):
+    text: str
+    context: Optional[str] = ""
+
+
+@router.post("/api/voice/refine")
+async def voice_refine_endpoint(req: VoiceRefineRequest):
+    """Refine a spoken draft into one executable project instruction without running it."""
+    draft = " ".join(req.text.split()).strip()
+    if not draft:
+        raise HTTPException(status_code=400, detail="No voice transcript supplied")
+    try:
+        from brjarvis.core.bootstrap import build_assistant_runtime
+
+        runtime = build_assistant_runtime()
+        profile = runtime.router.route(["fast_inference", "analysis"])
+        backend = runtime.router.get_backend(profile)
+        if backend is None or not hasattr(backend, "complete"):
+            raise RuntimeError("No configured refinement model is available")
+        system = (
+            "You refine speech transcripts into concise, explicit project instructions. "
+            "Correct obvious transcription errors, preserve intent, fill only harmless grammar gaps, "
+            "and return only the refined instruction. Do not execute tools, browse, or add commentary."
+        )
+        result = backend.complete(
+            messages=[{"role": "user", "content": f"Spoken draft:\n{draft}\nContext:\n{req.context or 'None'}"}],
+            system=system,
+            max_tokens=240,
+        )
+        refined = " ".join(str(result or "").split()).strip()
+        if not refined or refined.upper().startswith("ERROR:"):
+            raise RuntimeError("The refinement model did not return a usable instruction")
+        return {"status": "success", "draft": draft, "refined": refined}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Voice refinement unavailable: {exc}")
+
+
 @router.post("/api/voice/stt")
+
 async def voice_stt_endpoint(file: UploadFile = File(...)):
     """Convert uploaded audio file to text using speech-to-text engine."""
     try:

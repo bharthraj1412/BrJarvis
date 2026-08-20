@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
+import sys
 import threading
+import time
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
@@ -90,6 +93,9 @@ class FloatingRuntimeAdapter:
         voice_controller: Any = None,
         speaker_controller: Any = None,
         workspace_opener: Optional[Callable[[str], Any]] = None,
+        refiner: Optional[Callable[[str], str]] = None,
+        backend_probe: Optional[Callable[[], bool]] = None,
+        backend_starter: Optional[Callable[[], Any]] = None,
     ) -> None:
         self.orchestrator = orchestrator
         self._session = request_session
@@ -99,8 +105,13 @@ class FloatingRuntimeAdapter:
         self._voice_controller = voice_controller
         self._speaker_controller = speaker_controller
         self._workspace_opener = workspace_opener
+        self._refiner = refiner
+        self._backend_probe = backend_probe
+        self._backend_starter = backend_starter
+        self._backend_process: Any = None
         self._lock = threading.RLock()
         self._connector_inflight = False
+        self._operation_generation = 0
         default_capabilities = dict(FloatingWidgetState().capabilities)
         if voice_controller is None:
             try:
@@ -110,7 +121,8 @@ class FloatingRuntimeAdapter:
                 self._voice_controller = voice_controller
             except Exception:
                 voice_controller = None
-        default_capabilities["voice"] = bool(voice_trigger is not None or voice_controller is not None and voice_controller.available)
+        controller_available = bool(voice_controller is not None and getattr(voice_controller, "available", True))
+        default_capabilities["voice"] = bool(voice_trigger is not None or controller_available)
         default_capabilities["voice_to_text"] = default_capabilities["voice"]
         default_capabilities["speaker"] = True
         self._state = FloatingWidgetState(capabilities=default_capabilities)
@@ -142,6 +154,8 @@ class FloatingRuntimeAdapter:
             current = self._state
             if "connectors_data" in changes and changes["connectors_data"] is not None:
                 changes["connectors_data"] = tuple(dict(item) for item in changes["connectors_data"])
+            if "recent_tasks" in changes and changes["recent_tasks"] is not None:
+                changes["recent_tasks"] = tuple(dict(item) for item in changes["recent_tasks"])
             if "capabilities" in changes and changes["capabilities"] is not None:
                 changes["capabilities"] = {**current.capabilities, **dict(changes["capabilities"])}
             self._state = replace(current, **changes)
@@ -161,7 +175,10 @@ class FloatingRuntimeAdapter:
             self._voice_trigger = voice_trigger
         return self.update(
             runtime="embedded_online" if orchestrator is not None else "offline",
-            capabilities={"voice": voice_trigger is not None or self._voice_controller is not None and self._voice_controller.available, "voice_to_text": self._voice_controller is not None and self._voice_controller.available},
+            capabilities={
+                "voice": voice_trigger is not None or bool(self._voice_controller is not None and getattr(self._voice_controller, "available", True)),
+                "voice_to_text": bool(self._voice_controller is not None and getattr(self._voice_controller, "available", True)),
+            },
             error=None,
         )
 
@@ -203,6 +220,7 @@ class FloatingRuntimeAdapter:
                         "task_id": str(task.get("task_id", "")),
                         "goal": str(task.get("goal") or task.get("user_request") or "Untitled task"),
                         "status": str(task.get("status", "")),
+                        "answer": str(task.get("final_report") or task.get("completion_evidence") or task.get("result") or ""),
                         "updated_at": task.get("updated_at"),
                     })
             self.update(recent_tasks=safe_tasks)
@@ -240,8 +258,11 @@ class FloatingRuntimeAdapter:
             self._voice_controller.stop()
         if self._speaker_controller is not None and self._speaker_controller.speaking:
             self._speaker_controller.stop()
-        self.update(input="submitting", voice="ready", speaker="inactive", audio="inactive", assistant="processing", task="running", message=f"> {prompt}", error=None)
-        thread = threading.Thread(target=self._run_command, args=(prompt,), daemon=True, name="floating-command")
+        with self._lock:
+            self._operation_generation += 1
+            operation = self._operation_generation
+        self.update(input="submitting", voice="ready", speaker="inactive", audio="inactive", assistant="processing", task="running", transcript="", message=f"> {prompt}", error=None)
+        thread = threading.Thread(target=self._run_command, args=(prompt, operation), daemon=True, name="floating-command")
         thread.start()
 
     def trigger_voice(self) -> None:
@@ -267,9 +288,13 @@ class FloatingRuntimeAdapter:
         )
 
     def stop_voice_capture(self) -> None:
+        finished_for_transcription = False
         if self._voice_controller is not None:
-            self._voice_controller.stop()
-        self.update(audio="inactive", voice="ready", assistant="idle", message="Voice capture stopped.")
+            finished_for_transcription = bool(self._voice_controller.stop())
+        if finished_for_transcription:
+            self.update(audio="inactive", voice="transcribing", assistant="processing", message="Transcribing your recording…")
+        else:
+            self.update(audio="inactive", voice="ready", assistant="idle", message="Voice capture stopped.")
 
     def _voice_state(self, state: str, message: str) -> None:
         audio = "recording" if state == "recording" else "inactive"
@@ -277,7 +302,57 @@ class FloatingRuntimeAdapter:
         self.update(audio=audio, voice=state, assistant=assistant, message=message)
 
     def _voice_transcript(self, transcript: str) -> None:
-        self.update(transcript=str(transcript).strip(), voice="ready", audio="inactive", assistant="idle", message="Transcript ready.", error=None)
+        draft = str(transcript or "").strip()
+        if not draft:
+            self._voice_error("No speech detected. Click MIC to try again.")
+            return
+        with self._lock:
+            self._operation_generation += 1
+            operation = self._operation_generation
+        self.update(transcript=draft, voice="refining", audio="inactive", assistant="processing", message="Refining your command…", error=None)
+        thread = threading.Thread(target=self._refine_and_submit, args=(draft, operation), daemon=True, name="floating-voice-refine")
+        thread.start()
+
+    def _refine_and_submit(self, draft: str, operation: int) -> None:
+        try:
+            refined = self._refine_transcript(draft)
+            with self._lock:
+                if operation != self._operation_generation:
+                    return
+            self.update(transcript=refined, voice="ready", message="Refined command ready. Sending to project…", error=None)
+            self.submit_command(refined)
+        except Exception as exc:  # noqa: BLE001 - refinement is a recoverable boundary
+            logger.info("Floating voice refinement failed: %s", exc)
+            with self._lock:
+                if operation != self._operation_generation:
+                    return
+            self.update(voice="error", audio="inactive", assistant="error", input="idle", message="Voice command needs review.", error=self._safe_error(exc))
+
+    def _refine_transcript(self, draft: str) -> str:
+        if self._refiner is not None:
+            refined = str(self._refiner(draft) or "").strip()
+            if refined:
+                return refined
+            raise RuntimeError("The refinement model returned no instruction")
+        if self.orchestrator is not None and hasattr(self.orchestrator, "router"):
+            profile = self.orchestrator.router.route(["fast_inference", "analysis"])
+            backend = self.orchestrator.router.get_backend(profile)
+            if backend is not None and hasattr(backend, "complete"):
+                result = backend.complete(
+                    messages=[{"role": "user", "content": f"Spoken draft:\n{draft}"}],
+                    system="Refine this speech transcript into one concise explicit project instruction. Return only the instruction. Do not execute it.",
+                    max_tokens=240,
+                )
+                refined = " ".join(str(result or "").split()).strip()
+                if refined and not refined.upper().startswith("ERROR:"):
+                    return refined
+        response = self._request("POST", "/api/voice/refine", json={"text": draft}, timeout=30.0)
+        if getattr(response, "raise_for_status", None):
+            response.raise_for_status()
+        refined = str(response.json().get("refined") or "").strip()
+        if not refined:
+            raise RuntimeError("The refinement model returned no instruction")
+        return refined
 
     def _voice_error(self, message: str) -> None:
         self.update(voice="error", audio="inactive", assistant="error", error=str(message), message="Voice input needs attention.")
@@ -310,12 +385,14 @@ class FloatingRuntimeAdapter:
         self.update(speaker="unavailable", audio="inactive", assistant="error", error=str(message), message="Speaker unavailable.")
 
     def request_workspace_handoff(self, on_ready: Optional[Callable[[str], Any]] = None) -> None:
-        self.update(workspace="authenticating", message="Connecting workspace…", error=None)
+        self.update(workspace="starting_backend", message="Starting workspace backend…", error=None)
         thread = threading.Thread(target=self._run_workspace_handoff, args=(on_ready,), daemon=True, name="floating-workspace-handoff")
         thread.start()
 
     def _run_workspace_handoff(self, on_ready: Optional[Callable[[str], Any]]) -> None:
         try:
+            self._ensure_backend()
+            self.update(workspace="authenticating", message="Connecting workspace session…", error=None)
             response = self._request("POST", "/api/auth/desktop-handoff", json={"redirect": "/web/"}, timeout=5.0)
             if getattr(response, "raise_for_status", None):
                 response.raise_for_status()
@@ -330,6 +407,46 @@ class FloatingRuntimeAdapter:
             logger.info("Workspace handoff failed: %s", exc)
             self.update(workspace="failed", message="Workspace connection failed.", error=self._safe_error(exc))
 
+    def _ensure_backend(self) -> None:
+        if self._probe_backend():
+            return
+        self.update(workspace="starting_backend", message="Starting workspace backend…", error=None)
+        if self._backend_starter is not None:
+            self._backend_starter()
+        else:
+            self._start_backend_process()
+        deadline = time.monotonic() + 20.0
+        while time.monotonic() < deadline:
+            if self._probe_backend():
+                return
+            time.sleep(0.35)
+        raise RuntimeError("Workspace backend did not become ready. Start it with: python start.py web")
+
+    def _probe_backend(self) -> bool:
+        if self._backend_probe is not None:
+            return bool(self._backend_probe())
+        try:
+            response = self._request("GET", "/api/auth/status", timeout=1.0)
+            return int(getattr(response, "status_code", 0)) == 200
+        except Exception:
+            return False
+
+    def _start_backend_process(self) -> None:
+        if self._backend_process is not None and self._backend_process.poll() is None:
+            return
+        root = Path(__file__).resolve().parents[3]
+        port = os.environ.get("BR_SERVER_PORT") or os.environ.get("PORT") or "8000"
+        command = [sys.executable, str(root / "start.py"), "web", "--port", str(port), "--no-open"]
+        kwargs: dict[str, Any] = {
+            "cwd": str(root),
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.STDOUT,
+        }
+        if os.name == "nt":
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        self._backend_process = subprocess.Popen(command, **kwargs)
+
     def refresh_connectors(self) -> None:
         if not self.snapshot().capabilities.get("connectors", False):
             self.set_connector_health("unavailable")
@@ -341,16 +458,22 @@ class FloatingRuntimeAdapter:
         thread = threading.Thread(target=self._fetch_connectors, daemon=True, name="floating-connectors")
         thread.start()
 
-    def _run_command(self, prompt: str) -> None:
+    def _run_command(self, prompt: str, operation: int) -> None:
         try:
             if self.orchestrator is not None:
                 response = self.orchestrator.chat(prompt)
             else:
                 response = self._post_chat(prompt)
             text = self._response_text(response)
+            with self._lock:
+                if operation != self._operation_generation:
+                    return
             self.update(input="idle", assistant="listening", task="completed", message=text or "Command completed.", latest_response=text or "Command completed.", error=None)
         except Exception as exc:  # noqa: BLE001 - boundary converts errors to user state
             logger.warning("Floating command failed: %s", exc)
+            with self._lock:
+                if operation != self._operation_generation:
+                    return
             self.update(input="error", assistant="error", task="failed", message="Command failed.", error=self._safe_error(exc))
 
     def _fetch_connectors(self) -> None:

@@ -253,9 +253,28 @@ def test_task_context_renders_previous_task_choices(qt_app):
         task="none",
     )
     qt_app.processEvents()
-    assert widget._context.title.text() == "Previous tasks"
+    assert widget._context.title.text() == "Completed and previous tasks"
     assert len(widget._context._buttons) == 1
     assert "Review a chapter" in widget._context._buttons[0].toolTip()
+    widget.hide()
+    widget.deleteLater()
+    qt_app.processEvents()
+
+
+
+def test_context_refresh_does_not_duplicate_actions_or_show_dead_approval(qt_app):
+    widget = JarvisFloat()
+    widget._runtime.update(task="waiting_for_approval", message="A review is required.")
+    widget.show_context()
+    qt_app.processEvents()
+    assert [button.text() for button in widget._context._buttons] == ["Open workspace"]
+
+    widget._runtime.update(recent_tasks=({"task_id": "task_1", "goal": "Read notes", "status": "WAITING_FOR_USER"},), task="none")
+    qt_app.processEvents()
+    assert len(widget._context._buttons) == 1
+    widget._runtime.update(recent_tasks=({"task_id": "task_1", "goal": "Read notes", "status": "WAITING_FOR_USER"},), task="none")
+    qt_app.processEvents()
+    assert len(widget._context._buttons) == 1
     widget.hide()
     widget.deleteLater()
     qt_app.processEvents()

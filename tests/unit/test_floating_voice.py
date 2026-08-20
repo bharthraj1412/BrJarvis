@@ -166,3 +166,44 @@ def test_stopped_voice_worker_cannot_emit_late_error(monkeypatch):
 
     time.sleep(0.1)
     assert not any(state == "error" for state, _ in states)
+
+
+
+def test_manual_stop_buffers_audio_then_transcribes(monkeypatch):
+    class _ManualMic:
+        SAMPLE_RATE = 16000
+
+        def __init__(self):
+            self.closed = threading.Event()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.closed.set()
+
+        def read(self, size):
+            if self.closed.is_set():
+                return b""
+            return b"\x01\x00" * min(size, 256)
+
+    monkeypatch.setitem(sys.modules, "speech_recognition", types.SimpleNamespace(Recognizer=_Recognizer))
+    transcript = []
+    done = threading.Event()
+    captured = []
+    controller = FloatingVoiceController(
+        microphone_factory=_ManualMic,
+        transcriber=lambda wav: captured.append(wav) or "manual recording transcript",
+        max_record_seconds=2,
+    )
+    controller.start(on_transcript=lambda text: (transcript.append(text), done.set()))
+    import time
+
+    for _ in range(200):
+        if controller._manual_mode:
+            break
+        time.sleep(0.005)
+    assert controller.stop() is True
+    assert done.wait(timeout=2)
+    assert transcript == ["manual recording transcript"]
+    assert captured and captured[0].startswith(b"RIFF")

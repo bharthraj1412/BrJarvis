@@ -227,13 +227,26 @@ if HAS_QT:
             layout.addLayout(self.actions)
             self._buttons: list[QPushButton] = []
 
-        def show_task_history(self, tasks: tuple[Mapping[str, Any], ...] | list[Mapping[str, Any]]) -> None:
-            self.title.setText("Previous tasks")
-            self.body.setText("Select a task to load its original request into the command field. Review it before sending.")
-            self.progress.hide()
-            for button in self._buttons:
-                button.deleteLater()
+        def _clear_actions(self) -> None:
+            while self.actions.count():
+                item = self.actions.takeAt(0)
+                child = item.widget()
+                if child is not None:
+                    child.deleteLater()
             self._buttons = []
+
+        def show_task_history(self, tasks: tuple[Mapping[str, Any], ...] | list[Mapping[str, Any]]) -> None:
+            self.title.setText("Completed and previous tasks")
+            summaries = []
+            for task in list(tasks)[:4]:
+                goal = str(task.get("goal", "Untitled task")).strip()
+                answer = str(task.get("answer", "")).strip()
+                if answer:
+                    summaries.append(f"{goal[:30]}: {answer[:72]}")
+            summary_text = "\n".join(summaries)
+            self.body.setText(("Recent answers:\n" + summary_text + "\n\n" if summary_text else "") + "Select a task to load its original request. Review it before sending.")
+            self.progress.hide()
+            self._clear_actions()
             for task in list(tasks)[:6]:
                 task_id = str(task.get("task_id", ""))
                 goal = str(task.get("goal", "Untitled task")).strip()
@@ -253,9 +266,7 @@ if HAS_QT:
             self.progress.setVisible(progress is not None)
             if progress is not None:
                 self.progress.setValue(max(0, min(100, int(progress))))
-            for button in self._buttons:
-                button.deleteLater()
-            self._buttons = []
+            self._clear_actions()
             for action in actions:
                 button = QPushButton(action)
                 button.setObjectName("primary" if action in {"Retry", "Approve", "Open workspace"} else "secondary")
@@ -414,10 +425,10 @@ if HAS_QT:
                 self.voice.setEnabled(True)
                 self.voice.setText("STOP")
                 self.voice.setToolTip("Stop listening")
-            elif normalized == "transcribing":
+            elif normalized in {"transcribing", "refining"}:
                 self.voice.setEnabled(False)
-                self.voice.setText("…")
-                self.voice.setToolTip("Transcribing your voice")
+                self.voice.setText("REFINE" if normalized == "refining" else "…")
+                self.voice.setToolTip("Refining your voice command" if normalized == "refining" else "Transcribing your voice")
             else:
                 self.voice.setEnabled(True)
                 self.voice.setText("MIC")
@@ -606,8 +617,9 @@ if HAS_QT:
             self._minimized = False
             if state.task in {"running", "waiting_for_approval", "approval"}:
                 title = "Approval required" if state.task in {"waiting_for_approval", "approval"} else "Current task"
-                actions = ("Approve", "Open workspace") if state.task in {"waiting_for_approval", "approval"} else ("Open workspace",)
-                self._context.show_content("task", title, state.message or "A task is active.", actions=actions)
+                actions = ("Open workspace",)
+                body = state.message or ("Review and approve this task in the workspace." if state.task in {"waiting_for_approval", "approval"} else "A task is active.")
+                self._context.show_content("task", title, body, actions=actions)
             elif state.error:
                 self._context.show_content("error", "Needs attention", state.error, actions=("Retry", "Open workspace"))
             else:
